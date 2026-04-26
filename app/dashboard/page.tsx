@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import jwt from "jsonwebtoken";
-import Dashboard from "@/pages/Dashboard";
+import Dashboard from "./Dashboard";
 
 export default async function DashboardPage() {
   const cookieStore = await cookies();

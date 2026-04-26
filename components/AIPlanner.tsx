@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Wand2 } from "lucide-react";
-import { supabase } from "@/lib/supabaseClient";
+
+type AuthUser = { id: string; email: string } | null;
 
 export const AIPlanner = () => {
   const [destination, setDestination] = useState("");
@@ -13,92 +14,77 @@ export const AIPlanner = () => {
   const [plan, setPlan] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<AuthUser>(null);
 
-  // ✅ Load session once
+  // Load the JWT-authenticated user once on mount
   useEffect(() => {
-    const getSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (session?.user) {
-        setUser(session.user);
+    const checkAuth = async () => {
+      try {
+        const res = await fetch("/api/auth/me");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.user) setUser(data.user);
+      } catch {
+        // not logged in — that's fine, generation still works
       }
     };
 
-    getSession();
+    checkAuth();
   }, []);
 
   const handleGenerate = async () => {
-  if (!destination || !days || !budget) {
-    setError("Please fill all fields");
-    return;
-  }
-
-  setError("");
-  setLoading(true);
-  setPlan(null);
-
-  try {
-    // ✅ ALWAYS get fresh session here
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    const user = session?.user;
-
-    // 🔹 1. Generate AI plan (always)
-    const res = await fetch("/api/ai/plan-trip", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        destination,
-        days,
-        budget,
-      }),
-    });
-
-    const data = await res.json();
-
-    if (!data.plan) {
-      setError("Failed to generate plan. Try again.");
-      setLoading(false);
+    if (!destination || !days || !budget) {
+      setError("Please fill all fields");
       return;
     }
 
-    setPlan(data.plan);
+    setError("");
+    setLoading(true);
+    setPlan(null);
 
-    // 🔹 2. Save ONLY if user exists
-    if (!user) {
-      console.warn("User not logged in → skipping save");
-    } else {
-      const saveRes = await fetch("/api/trips/save", {
+    try {
+      // 1. Generate AI plan (works for all users, logged in or not)
+      const res = await fetch("/api/ai/plan-trip", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          user_id: user.id,
-          destination,
-          days,
-          budget,
-          plan: data.plan,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ destination, days, budget }),
       });
 
-      const saveData = await saveRes.json();
-      console.log("SAVE RESPONSE:", saveData);
-    }
-  } catch (err) {
-    console.error(err);
-    setError("Something went wrong. Check API.");
-  }
+      const data = await res.json();
 
-  setLoading(false);
-};
+      if (!data.plan) {
+        setError("Failed to generate plan. Try again.");
+        setLoading(false);
+        return;
+      }
+
+      setPlan(data.plan);
+
+      // 2. Save to DB only if the user is logged in via JWT cookie.
+      //    The save route reads the user ID from the cookie itself —
+      //    we do NOT pass user_id in the body (prevents spoofing).
+      if (!user) {
+        console.warn("User not logged in → skipping save");
+      } else {
+        const saveRes = await fetch("/api/trips/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          // credentials: "include" ensures the httpOnly cookie is sent
+          body: JSON.stringify({ destination, days, budget, plan: data.plan }),
+        });
+
+        const saveData = await saveRes.json();
+        if (!saveData.success) {
+          console.error("Save failed:", saveData.error);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Something went wrong. Check API.");
+    }
+
+    setLoading(false);
+  };
   return (
     <section className="py-24 sm:py-32 gradient-soft">
       <div className="container max-w-5xl mx-auto">

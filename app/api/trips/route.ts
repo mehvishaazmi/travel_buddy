@@ -3,9 +3,9 @@ import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { supabaseAdmin } from "@/lib/db";
 
-export async function POST(req: Request) {
+export async function GET() {
   try {
-    // Authenticate via JWT cookie — never trust user_id from the request body
+    // ── 1. Authenticate ──────────────────────────────────────────────────────
     const cookieStore = await cookies();
     const token = cookieStore.get("token")?.value;
 
@@ -25,24 +25,20 @@ export async function POST(req: Request) {
 
     const user_id = decoded.id;
 
-    // Parse the trip payload — user_id from body is intentionally ignored
-    const body = await req.json();
-    const { destination, days, budget, plan } = body;
-
-    if (!destination || !days || !budget || !plan) {
-      return NextResponse.json({ error: "Missing trip data" }, { status: 400 });
-    }
-
-    const { data, error } = await supabaseAdmin.from("trips").insert([
-      { user_id, destination, days, budget, plan },
-    ]);
+    // ── 2. Query — filtered by user_id so users never see each other's trips ─
+    const { data: trips, error } = await supabaseAdmin
+      .from("trips")
+      .select("id, destination, days, budget, plan, created_at")
+      .eq("user_id", user_id)
+      .order("created_at", { ascending: false });
 
     if (error) {
       console.error("DB ERROR:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, data });
+    // ── 3. Return ─────────────────────────────────────────────────────────────
+    return NextResponse.json({ trips: trips ?? [] });
   } catch (err) {
     console.error("SERVER ERROR:", err);
     return NextResponse.json({ error: "Server failed" }, { status: 500 });

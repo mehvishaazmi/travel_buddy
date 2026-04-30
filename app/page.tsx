@@ -1,7 +1,6 @@
-import { Navbar } from "@/components/Navbar";
+import Navbar from "@/components/Navbar";
 import { Hero } from "@/components/Hero";
 import { SmartSearch } from "@/components/SmartSearch";
-import { AIPlanner } from "@/components/AIPlanner";
 import { Destinations } from "@/components/Destinations";
 import { BuddyMatching } from "@/components/BuddyMatching";
 import { ExpenseSplit } from "@/components/ExpenseSplit";
@@ -17,16 +16,16 @@ const Index = () => {
       <main>
         <Hero />
         <SmartSearch />
-        <AIPlanner />
         <Destinations />
         <BuddyMatching />
         <ExpenseSplit />
         <Features />
         <Testimonials />
-        <CTA />
+        <CTA />        
       </main>
       <Footer />
     </div>
+    
   );
 };
 

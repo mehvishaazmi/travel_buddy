@@ -1,79 +1,71 @@
 import { NextResponse } from "next/server";
-import Groq from "groq-sdk";
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY!,
-});
+const randomPick = (arr: string[]) =>
+  arr[Math.floor(Math.random() * arr.length)];
 
 export async function POST(req: Request) {
   try {
     const { destination, days, budget } = await req.json();
 
-    const prompt = `
-You are a travel planner API.
+    await new Promise((res) => setTimeout(res, 1200)); // delay
 
-Return ONLY valid JSON. No explanation, no text outside JSON.
+    const placesPool = [
+      "Beach",
+      "Fort",
+      "Temple",
+      "Market",
+      "Museum",
+      "Waterfall",
+      "Cafe",
+      "Viewpoint",
+    ];
 
-Destination: ${destination}
-Days: ${days}
-Budget: ${budget}
+    const activitiesPool = [
+      "Explore local attractions",
+      "Try street food",
+      "Take photos",
+      "Shopping",
+      "Relax at scenic spot",
+      "Enjoy nightlife",
+    ];
 
-JSON format:
+    const itinerary = Array.from({ length: Number(days) }, (_, i) => ({
+      day: i + 1,
+      title:
+        i === 0
+          ? "Arrival & Check-in"
+          : randomPick([
+              "Adventure Day",
+              "Exploration Day",
+              "Relax & Enjoy",
+            ]),
+      activities: Array.from({ length: 3 }, () =>
+        randomPick(activitiesPool)
+      ),
+    }));
 
-{
-  "itinerary": [
-    {
-      "day": 1,
-      "title": "string",
-      "activities": ["string", "string"]
-    }
-  ],
-  "budget": {
-    "stay": "string",
-    "food": "string",
-    "travel": "string",
-    "activities": "string"
-  },
-  "places": ["string"],
-  "tips": ["string"]
-}
-`;
-
-    const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [
-        { role: "system", content: "You are a strict JSON generator." },
-        { role: "user", content: prompt },
+    const plan = {
+      itinerary,
+      budget: {
+        hotel: `₹${Math.floor(budget * 0.4)}`,
+        food: `₹${Math.floor(budget * 0.2)}`,
+        transport: `₹${Math.floor(budget * 0.2)}`,
+        activities: `₹${Math.floor(budget * 0.2)}`,
+      },
+      places: Array.from({ length: 5 }, () =>
+        `${destination} ${randomPick(placesPool)}`
+      ),
+      tips: [
+        "Carry sunscreen",
+        "Book tickets early",
+        "Keep emergency cash",
+        "Stay hydrated",
       ],
-      temperature: 0.7,
-    });
+    };
 
-    let result = completion.choices[0]?.message?.content || "";
+    return NextResponse.json({ plan });
 
-    // 🧠 CLEAN RESPONSE (VERY IMPORTANT)
-    result = result
-      .replace(/```json/g, "")
-      .replace(/```/g, "")
-      .trim();
-
-    let parsed;
-
-try {
-  const cleaned = result.trim().replace(/```json|```/g, "");
-  parsed = JSON.parse(cleaned);
-} catch (err) {
-  console.error("JSON parse error:", err);
-  return NextResponse.json({ plan: null, raw: result });
-}
-
-return NextResponse.json({ plan: parsed });
-
-  } catch (error: any) {
-    console.error("AI ERROR:", error);
-
-    return NextResponse.json(
-      { error: error.message || "AI error" },
-      { status: 500 }
-    );
+  } catch {
+    return NextResponse.json({ error: "Mock AI failed" }, { status: 500 });
   }
 }

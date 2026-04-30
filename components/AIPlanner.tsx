@@ -1,10 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Wand2 } from "lucide-react";
-
-type AuthUser = { id: string; email: string } | null;
 
 export const AIPlanner = () => {
   const [destination, setDestination] = useState("");
@@ -14,24 +12,8 @@ export const AIPlanner = () => {
   const [plan, setPlan] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [user, setUser] = useState<AuthUser>(null);
 
-  // Load the JWT-authenticated user once on mount
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const res = await fetch("/api/auth/me");
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.user) setUser(data.user);
-      } catch {
-        // not logged in — that's fine, generation still works
-      }
-    };
-
-    checkAuth();
-  }, []);
-
+  // 🔥 GENERATE PLAN
   const handleGenerate = async () => {
     if (!destination || !days || !budget) {
       setError("Please fill all fields");
@@ -43,189 +25,148 @@ export const AIPlanner = () => {
     setPlan(null);
 
     try {
-      // 1. Generate AI plan (works for all users, logged in or not)
       const res = await fetch("/api/ai/plan-trip", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ destination, days, budget }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          destination,
+          days,
+          budget,
+        }),
       });
 
       const data = await res.json();
 
-      if (!data.plan) {
-        setError("Failed to generate plan. Try again.");
-        setLoading(false);
-        return;
+      if (!res.ok) {
+        throw new Error(data.error || "AI failed");
       }
 
       setPlan(data.plan);
-
-      // 2. Save to DB only if the user is logged in via JWT cookie.
-      //    The save route reads the user ID from the cookie itself —
-      //    we do NOT pass user_id in the body (prevents spoofing).
-      if (!user) {
-        console.warn("User not logged in → skipping save");
-      } else {
-        const saveRes = await fetch("/api/trips/save", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          // credentials: "include" ensures the httpOnly cookie is sent
-          body: JSON.stringify({ destination, days, budget, plan: data.plan }),
-        });
-
-        const saveData = await saveRes.json();
-        if (!saveData.success) {
-          console.error("Save failed:", saveData.error);
-        }
-      }
-    } catch (err) {
-      console.error(err);
-      setError("Something went wrong. Check API.");
+    } catch (err: any) {
+      setError(err.message);
     }
 
     setLoading(false);
   };
-  return (
-    <section className="py-24 sm:py-32 gradient-soft">
-      <div className="container max-w-5xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-10">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 text-accent text-xs font-semibold uppercase tracking-wider">
-            <Sparkles className="h-3.5 w-3.5" />
-            AI Trip Planner
-          </span>
 
-          <h2 className="mt-4 text-4xl font-bold">Plan your trip with AI ✨</h2>
+  return (
+    <section className="py-24 gradient-soft">
+      <div className="max-w-5xl mx-auto px-6">
+
+        {/* HEADER */}
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+            <Sparkles className="h-4 w-4" />
+            AI Trip Planner
+          </div>
+
+          <h2 className="mt-4 text-4xl font-bold">
+            Plan your trip with AI ✨
+          </h2>
         </div>
 
-        {/* Input */}
-        <div className="bg-card border rounded-2xl p-6 space-y-4 shadow">
+        {/* INPUT CARD */}
+        <div className="bg-white/70 backdrop-blur border shadow-xl rounded-3xl p-6 space-y-4">
+
           <input
-            placeholder="Destination (e.g. Bali)"
-            className="w-full p-3 border rounded-lg"
+            placeholder="Destination (e.g. Goa, Bali)"
+            className="w-full p-3 rounded-xl border outline-none"
             value={destination}
             onChange={(e) => setDestination(e.target.value)}
           />
 
-          <input
-            placeholder="Days (e.g. 4)"
-            className="w-full p-3 border rounded-lg"
-            value={days}
-            onChange={(e) => setDays(e.target.value)}
-          />
+          <div className="grid sm:grid-cols-2 gap-4">
+            <input
+              placeholder="Days (e.g. 3)"
+              className="p-3 rounded-xl border outline-none"
+              value={days}
+              onChange={(e) => setDays(e.target.value)}
+            />
 
-          <input
-            placeholder="Budget (e.g. low / mid / luxury)"
-            className="w-full p-3 border rounded-lg"
-            value={budget}
-            onChange={(e) => setBudget(e.target.value)}
-          />
+            <input
+              placeholder="Budget (₹5000)"
+              className="p-3 rounded-xl border outline-none"
+              value={budget}
+              onChange={(e) => setBudget(e.target.value)}
+            />
+          </div>
 
           <Button
             onClick={handleGenerate}
-            className="w-full"
             disabled={loading}
+            className="w-full rounded-xl gradient-hero text-white"
           >
-            <Wand2 className="h-4 w-4 mr-2" />
-            {loading ? "Generating..." : "Generate Plan"}
+            <Wand2 className="mr-2 h-4 w-4" />
+            {loading ? "Generating..." : "Generate AI Plan"}
           </Button>
 
-          {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-        </div>
-
-        {/* OUTPUT */}
-        <div className="mt-10">
-          {/* Loading */}
-          {loading && (
-            <div className="text-center mt-6">
-              <p className="text-lg font-semibold">
-                Generating your trip... 🤖
-              </p>
-              <p className="text-sm text-muted-foreground">
-                This may take a few seconds
-              </p>
-            </div>
-          )}
-
-          {/* Empty */}
-          {!plan && !loading && !error && (
-            <p className="text-center text-muted-foreground mt-6">
-              Generate a plan to see your itinerary ✨
+          {error && (
+            <p className="text-red-500 text-center text-sm">
+              {error}
             </p>
           )}
+        </div>
 
-          {/* RESULT */}
-          {plan && (
-            <div className="space-y-10 mt-6 bg-gradient-to-br from-purple-50 to-blue-50 p-6 rounded-3xl">
-              {/* 📅 Itinerary */}
-              <div>
-                <h2 className="text-xl font-bold mb-4">📅 Itinerary</h2>
+        {/* LOADING UI */}
+        {loading && (
+          <div className="mt-10 space-y-4 animate-pulse">
+            <div className="h-[200px] bg-gray-200 rounded-2xl" />
+            <div className="h-[80px] bg-gray-200 rounded-xl" />
+            <div className="h-[80px] bg-gray-200 rounded-xl" />
+          </div>
+        )}
 
-                {plan.itinerary?.map((day: any, idx: number) => (
+        {/* RESULT */}
+        {!loading && plan && (
+          <div className="mt-10 space-y-8">
+
+            {/* ITINERARY */}
+            <div>
+              <h3 className="text-xl font-semibold mb-4">
+                📅 Itinerary
+              </h3>
+
+              {plan.itinerary?.map((day: any, i: number) => (
+                <div
+                  key={i}
+                  className="bg-white/80 border shadow rounded-2xl p-5 mb-4"
+                >
+                  <h4 className="font-semibold">
+                    Day {day.day} — {day.title}
+                  </h4>
+
+                  <ul className="mt-2 text-sm">
+                    {day.activities?.map((a: string, j: number) => (
+                      <li key={j}>• {a}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+
+            {/* BUDGET */}
+            <div>
+              <h3 className="text-xl font-semibold mb-4">
+                💰 Budget
+              </h3>
+
+              <div className="grid grid-cols-2 gap-4">
+                {Object.entries(plan.budget || {}).map(([k, v]) => (
                   <div
-                    key={idx}
-                    className="p-6 rounded-2xl border bg-white shadow-sm mb-4"
+                    key={k}
+                    className="bg-white border rounded-xl p-4 text-center"
                   >
-                    <h3 className="font-semibold text-lg mb-2">
-                      Day {day.day} — {day.title}
-                    </h3>
-
-                    <ul className="space-y-2 text-sm text-gray-600">
-                      {(day.activities || []).map((act: string, i: number) => (
-                        <li key={i}>• {act}</li>
-                      ))}
-                    </ul>
+                    <p className="text-sm">{k}</p>
+                    <p className="font-bold">{v as string}</p>
                   </div>
                 ))}
               </div>
-
-              {/* 💰 Budget */}
-              <div>
-                <h2 className="text-xl font-bold mb-4">💰 Budget</h2>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {Object.entries(plan.budget || {}).map(([key, value]) => (
-                    <div
-                      key={key}
-                      className="p-4 rounded-xl border bg-white text-center"
-                    >
-                      <h3 className="font-semibold capitalize text-sm text-gray-500">
-                        {key}
-                      </h3>
-                      <p className="text-lg font-bold mt-1">
-                        {value as string}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* 📍 Places */}
-              <div>
-                <h2 className="text-xl font-bold mb-4">📍 Places</h2>
-
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {(plan.places || []).map((place: string, i: number) => (
-                    <div key={i} className="p-4 rounded-xl border bg-white">
-                      📍 {place}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* ✈️ Tips */}
-              <div className="p-6 rounded-2xl bg-yellow-50 border">
-                <h2 className="font-bold text-lg mb-3">✈️ Travel Tips</h2>
-
-                <ul className="space-y-2 text-sm">
-                  {(plan.tips || []).map((tip: string, i: number) => (
-                    <li key={i}>💡 {tip}</li>
-                  ))}
-                </ul>
-              </div>
             </div>
-          )}
-        </div>
+
+          </div>
+        )}
       </div>
     </section>
   );

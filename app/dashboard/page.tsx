@@ -1,21 +1,9 @@
-import { cookies } from "next/headers";
+import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import jwt from "jsonwebtoken";
 import Dashboard from "./Dashboard";
 
 export default async function DashboardPage() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("token")?.value;
-
-  if (!token) {
-    redirect("/login");
-  }
-
-  try {
-    jwt.verify(token, process.env.JWT_SECRET!);
-  } catch {
-    redirect("/login");
-  }
-
+  const { userId } = await auth();
+  if (!userId) redirect("/sign-in");
   return <Dashboard />;
 }

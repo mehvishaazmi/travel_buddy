@@ -1,22 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import {
-  ArrowUpRight,
-  Calendar,
-  Clock,
-  Compass,
-  MapPin,
-  Plus,
-  Sparkles,
-  Wallet,
-} from "lucide-react";
-
-import { Navbar } from "@/components/Navbar";
-import { Footer } from "@/components/Footer";
+import Navbar from "@/components/Navbar";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Loader2, MapPin, Clock, Wallet, Plus } from "lucide-react";
+import { createClient } from "@supabase/supabase-js";
+import { useUser } from "@clerk/nextjs";
+import { Footer } from "@/components/Footer";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 type Trip = {
   id: string;
@@ -24,162 +20,97 @@ type Trip = {
   days: string;
   budget: string;
   created_at: string;
-  plan: any;
+  plan?: any;
 };
 
-// ✅ Better image generator (stable Unsplash)
-const getTripMeta = (destination: string) => ({
-  country: destination,
-  image: `https://images.unsplash.com/featured/?${destination},travel`,
-  vibe: "AI Generated",
-});
+const getImage = (destination: string) =>
+  `https://picsum.photos/seed/${destination.replace(/\s/g, "")}/800/500`;
 
-// ✅ Fallback image
-const FALLBACK_IMAGE =
-  "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80";
-
-const TripCardSkeleton = () => (
-  <div className="rounded-3xl border border-border/60 bg-card overflow-hidden">
-    <Skeleton className="aspect-[5/3] w-full" />
-    <div className="p-6 space-y-4">
-      <Skeleton className="h-5 w-2/3" />
-      <Skeleton className="h-4 w-1/2" />
-      <Skeleton className="h-10 w-full rounded-xl" />
-    </div>
-  </div>
-);
-
-const TripCard = ({ t }: { t: Trip }) => {
-  const meta = getTripMeta(t.destination);
-
-  return (
-    <article className="group overflow-hidden rounded-3xl border bg-card hover:-translate-y-2 hover:shadow-2xl transition-all duration-500">
-      {/* IMAGE */}
-      <div className="relative aspect-[5/3] overflow-hidden">
-        <img
-          src={meta.image}
-          alt={t.destination}
-          loading="lazy"
-          onError={(e) => {
-            e.currentTarget.src = FALLBACK_IMAGE;
-          }}
-          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
-        />
-
-        {/* overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-
-        {/* vibe */}
-        <span className="absolute top-3 left-3 bg-white/80 text-black text-xs px-2 py-1 rounded-full flex items-center gap-1">
-          <Sparkles className="h-3 w-3" />
-          {meta.vibe}
-        </span>
-
-        {/* location */}
-        <div className="absolute bottom-3 left-3 text-white">
-          <div className="flex items-center gap-1 text-xs opacity-90">
-            <MapPin className="h-3 w-3" /> {meta.country}
-          </div>
-          <h3 className="text-xl font-bold">{t.destination}</h3>
-        </div>
-      </div>
-
-      {/* CONTENT */}
-      <div className="p-6 flex flex-col gap-4">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-secondary/70 p-3 rounded-xl">
-            <div className="text-xs flex items-center gap-1 text-muted-foreground">
-              <Clock className="h-3 w-3" /> Days
-            </div>
-            <div className="font-bold">{t.days}</div>
-          </div>
-
-          <div className="bg-secondary/70 p-3 rounded-xl">
-            <div className="text-xs flex items-center gap-1 text-muted-foreground">
-              <Wallet className="h-3 w-3" /> Budget
-            </div>
-            <div className="font-bold">{t.budget}</div>
-          </div>
-        </div>
-
-        <div className="text-xs text-muted-foreground flex items-center gap-1">
-          <Calendar className="h-3 w-3" />
-          {new Date(t.created_at).toLocaleDateString()}
-        </div>
-
-        <Button asChild className="w-full rounded-xl">
-          <Link href={`/trips/${t.id}`}>
-            View Details
-            <ArrowUpRight className="h-4 w-4 ml-1" />
-          </Link>
-        </Button>
-      </div>
-    </article>
-  );
-};
-
-const EmptyState = () => (
-  <div className="text-center py-20">
-    <Compass className="mx-auto h-12 w-12 text-gray-400" />
-    <h3 className="text-xl font-bold mt-4">No trips yet</h3>
-    <p className="text-gray-500 mt-2">Start planning your first trip</p>
-  </div>
-);
-
-export default function Trips() {
+export default function TripsPage() {
+  const { user } = useUser();
+  const router = useRouter();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchTrips = async () => {
-      try {
-        const res = await fetch("/api/trips");
-        const data = await res.json();
-        setTrips(data.trips || []);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
+    if (!user?.id) return;
     fetchTrips();
-  }, []);
+  }, [user?.id]);
+
+  async function fetchTrips() {
+    setLoading(true);
+    const { data } = await supabase
+      .from("trips")
+      .select("*")
+      .eq("user_id", user!.id)
+      .order("created_at", { ascending: false });
+    setTrips(data ?? []);
+    setLoading(false);
+  }
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-
-      {/* HEADER */}
-      <section className="pt-28 pb-12 container flex justify-between items-center">
-        <h1 className="text-4xl font-bold">Your Trips</h1>
-        <Button asChild>
-          <Link href="/planner">
-            <Plus className="h-4 w-4 mr-1" />
-            New Trip
-          </Link>
-        </Button>
-      </section>
-
-      {/* CONTENT */}
-      <section className="container pb-24">
-        {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <TripCardSkeleton key={i} />
-            ))}
+      <main className="pt-28 pb-24 container">
+        <div className="flex justify-between items-center mb-10">
+          <div>
+            <h1 className="font-display text-4xl font-bold tracking-tight">Your Trips ✈️</h1>
+            <p className="mt-1 text-muted-foreground text-sm">{trips.length} trip{trips.length !== 1 && "s"} planned</p>
           </div>
-        ) : trips.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {trips.map((t) => (
-              <TripCard key={t.id} t={t} />
+          <Button variant="hero" className="rounded-xl shadow-glow" onClick={() => router.push("/plan-trip")}>
+            <Plus className="h-4 w-4" /> Plan New Trip
+          </Button>
+        </div>
+
+        {loading && (
+          <div className="flex justify-center py-24">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        )}
+
+        {!loading && trips.length === 0 && (
+          <div className="text-center py-24 rounded-3xl border border-dashed border-border">
+            <p className="text-2xl font-semibold">No trips yet 😔</p>
+            <p className="text-muted-foreground mt-2 mb-6">Start planning your first AI-powered trip!</p>
+            <Button variant="hero" className="rounded-xl shadow-glow" onClick={() => router.push("/plan-trip")}>
+              Plan Trip ✨
+            </Button>
+          </div>
+        )}
+
+        {!loading && trips.length > 0 && (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {trips.map((trip) => (
+              <div key={trip.id} onClick={() => router.push(`/trips/${trip.id}`)}
+                className="cursor-pointer group rounded-3xl overflow-hidden border border-border/60 bg-card shadow-soft hover:shadow-card hover:-translate-y-1 transition-smooth">
+                <div className="relative h-52 overflow-hidden">
+                  <img src={getImage(trip.destination)} alt={trip.destination}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-foreground/70 via-foreground/20 to-transparent" />
+                  <div className="absolute bottom-4 left-4 text-white">
+                    <div className="flex items-center gap-1 text-xs opacity-80 mb-1">
+                      <MapPin className="h-3 w-3" /> {trip.destination}
+                    </div>
+                  </div>
+                  <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md text-white text-xs px-3 py-1 rounded-full opacity-0 group-hover:opacity-100 transition">
+                    View Trip →
+                  </div>
+                </div>
+                <div className="p-5">
+                  <h2 className="font-display font-semibold text-lg">{trip.destination}</h2>
+                  <div className="mt-3 flex items-center gap-4 text-sm text-muted-foreground">
+                    <span className="flex items-center gap-1"><Clock className="h-4 w-4" /> {trip.days} days</span>
+                    <span className="flex items-center gap-1"><Wallet className="h-4 w-4" /> ₹{Number(trip.budget).toLocaleString()}</span>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Created {new Date(trip.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                  </p>
+                </div>
+              </div>
             ))}
           </div>
         )}
-      </section>
-
+      </main>
       <Footer />
     </div>
   );

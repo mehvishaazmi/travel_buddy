@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Navbar } from "@/components/Navbar";
+import Navbar from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,159 +58,198 @@ type Trip = {
 const TRIPS: Trip[] = [
   {
     id: 1,
-    img: "/dest-santorini.jpg",
-    location: "Santorini, Greece",
-    title: "Cliffside Sunsets & Caldera Cruise",
-    rating: 4.9,
-    reviews: 312,
-    duration: 7,
-    price: 1240,
-    tags: ["Sunsets", "Couples", "Cruise"],
-    type: "Honeymoon",
-    popularity: 98,
-  },
-  {
-    id: 2,
-    img: "/dest-bali.jpg",
-    location: "Ubud, Bali",
-    title: "Rice Terraces & Wellness Retreat",
+    img: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1200&auto=format",
+    location: "Goa",
+    title: "Beaches, Nightlife & Water Sports",
     rating: 4.8,
-    reviews: 528,
-    duration: 9,
-    price: 890,
-    tags: ["Yoga", "Nature", "Spa"],
-    type: "Honeymoon",
+    reviews: 520,
+    duration: 4,
+    price: 8000,
+    tags: ["Beach", "Party"],
+    type: "Weekend",
     popularity: 95,
   },
   {
-    id: 3,
-    img: "/dest-tokyo.jpg",
-    location: "Tokyo, Japan",
-    title: "Neon Nights & Hidden Alleyways",
+    id: 2,
+    img: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=1200&auto=format",
+    location: "Manali",
+    title: "Snow, Mountains & Adventure",
     rating: 4.9,
-    reviews: 421,
-    duration: 6,
-    price: 1560,
-    tags: ["Food", "Culture", "City"],
-    type: "Weekend",
+    reviews: 410,
+    duration: 5,
+    price: 9000,
+    tags: ["Snow", "Adventure"],
+    type: "Adventure",
     popularity: 92,
   },
   {
-    id: 4,
-    img: "/dest-swiss.jpg",
-    location: "Zermatt, Switzerland",
-    title: "Matterhorn Trekking Expedition",
-    rating: 4.9,
-    reviews: 198,
-    duration: 8,
-    price: 1820,
-    tags: ["Hiking", "Mountains", "Snow"],
-    type: "Adventure",
-    popularity: 88,
-  },
-  {
-    id: 5,
-    img: "/hero-travel.jpg",
-    location: "Lisbon, Portugal",
-    title: "Coastal Drive & Pastel de Nata Tour",
-    rating: 4.7,
-    reviews: 264,
-    duration: 5,
-    price: 760,
-    tags: ["Coast", "Food"],
-    type: "Weekend",
-    popularity: 84,
-  },
-  {
-    id: 6,
-    img: "/dest-bali.jpg",
-    location: "Canggu, Bali",
-    title: "Surf, Sunsets & Beach Clubs",
-    rating: 4.6,
-    reviews: 392,
-    duration: 7,
-    price: 980,
-    tags: ["Surf", "Beach"],
-    type: "Adventure",
-    popularity: 81,
-  },
-  {
-    id: 7,
-    img: "/dest-santorini.jpg",
-    location: "Amalfi Coast, Italy",
-    title: "Lemon Groves & Coastal Villages",
+    id: 3,
+    img: "https://images.unsplash.com/photo-1599661046289-e31897846e41?q=80&w=1200&auto=format",
+    location: "Amritsar",
+    title: "Golden Temple & Wagah Border",
     rating: 4.8,
-    reviews: 287,
-    duration: 6,
-    price: 1390,
-    tags: ["Coast", "Food", "Romance"],
+    reviews: 260,
+    duration: 2,
+    price: 5500,
+    tags: ["Spiritual", "History"],
     type: "Family",
-    popularity: 89,
-  },
-  {
-    id: 8,
-    img: "/dest-tokyo.jpg",
-    location: "Kyoto, Japan",
-    title: "Temples, Tea & Bamboo Forests",
-    rating: 4.9,
-    reviews: 356,
-    duration: 5,
-    price: 1180,
-    tags: ["Culture", "Heritage"],
-    type: "Family",
-    popularity: 90,
-  },
-  {
-    id: 9,
-    img: "/dest-swiss.jpg",
-    location: "Banff, Canada",
-    title: "Rockies Lake Loop Adventure",
-    rating: 4.8,
-    reviews: 221,
-    duration: 8,
-    price: 1670,
-    tags: ["Lakes", "Hiking"],
-    type: "Adventure",
     popularity: 86,
   },
   {
-    id: 10,
-    img: "/hero-travel.jpg",
-    location: "Marrakech, Morocco",
-    title: "Souks, Spices & Sahara Stars",
-    rating: 4.7,
-    reviews: 189,
-    duration: 6,
-    price: 920,
-    tags: ["Desert", "Culture"],
+    id: 4,
+    img: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1200&auto=format",
+    location: "Ladakh",
+    title: "Road Trip & High Pass Adventure",
+    rating: 4.9,
+    reviews: 260,
+    duration: 7,
+    price: 15000,
+    tags: ["Roadtrip", "Mountains"],
     type: "Adventure",
-    popularity: 78,
+    popularity: 97,
+  },
+  {
+    id: 5,
+    img: "https://images.unsplash.com/photo-1502082553048-f009c37129b9?q=80&w=1200&auto=format",
+    location: "Kerala",
+    title: "Backwaters & Nature Escape",
+    rating: 4.8,
+    reviews: 350,
+    duration: 6,
+    price: 11000,
+    tags: ["Nature", "Relax"],
+    type: "Honeymoon",
+    popularity: 91,
+  },
+  {
+    id: 6,
+    img: "https://images.unsplash.com/photo-1526779259212-939e64788e3c?q=80&w=1200&auto=format",
+    location: "Rishikesh",
+    title: "River Rafting & Spiritual Trip",
+    rating: 4.7,
+    reviews: 280,
+    duration: 3,
+    price: 6000,
+    tags: ["Adventure", "Spiritual"],
+    type: "Weekend",
+    popularity: 85,
+  },
+  {
+    id: 7,
+    img: "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?q=80&w=1200&auto=format",
+    location: "Shimla",
+    title: "Hills, Snow & Toy Train",
+    rating: 4.6,
+    reviews: 240,
+    duration: 4,
+    price: 7500,
+    tags: ["Hills", "Snow"],
+    type: "Family",
+    popularity: 82,
+  },
+  {
+    id: 8,
+    img: "https://images.unsplash.com/photo-1587135941948-670b381f08ce?q=80&w=1200&auto=format",
+    location: "Varanasi",
+    title: "Ganga Aarti & Spiritual Experience",
+    rating: 4.8,
+    reviews: 310,
+    duration: 2,
+    price: 5000,
+    tags: ["Spiritual", "Culture"],
+    type: "Family",
+    popularity: 87,
+  },
+  {
+    id: 9,
+    img: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=1200&auto=format",
+    location: "Andaman",
+    title: "Islands, Scuba & Beaches",
+    rating: 4.9,
+    reviews: 200,
+    duration: 5,
+    price: 18000,
+    tags: ["Island", "Scuba"],
+    type: "Honeymoon",
+    popularity: 93,
+  },
+  {
+    id: 10,
+    img: "https://images.unsplash.com/photo-1500534623283-312aade485b7?q=80&w=1200&auto=format",
+    location: "Udaipur",
+    title: "City of Lakes & Royal Stay",
+    rating: 4.8,
+    reviews: 270,
+    duration: 3,
+    price: 8500,
+    tags: ["Lakes", "Royal"],
+    type: "Honeymoon",
+    popularity: 89,
   },
   {
     id: 11,
-    img: "/dest-bali.jpg",
-    location: "Maldives",
-    title: "Overwater Villa Honeymoon Escape",
-    rating: 5.0,
-    reviews: 412,
-    duration: 5,
-    price: 2480,
-    tags: ["Beach", "Luxury"],
-    type: "Honeymoon",
-    popularity: 96,
+    img: "https://images.unsplash.com/photo-1470770841072-f978cf4d019e?q=80&w=1200&auto=format",
+    location: "Coorg",
+    title: "Coffee Estates & Waterfalls",
+    rating: 4.7,
+    reviews: 180,
+    duration: 3,
+    price: 6000,
+    tags: ["Coffee", "Nature"],
+    type: "Weekend",
+    popularity: 81,
   },
   {
     id: 12,
-    img: "/dest-santorini.jpg",
-    location: "Reykjavik, Iceland",
-    title: "Northern Lights & Glacier Trek",
-    rating: 4.8,
-    reviews: 174,
-    duration: 7,
-    price: 1740,
-    tags: ["Aurora", "Glacier"],
-    type: "Adventure",
-    popularity: 85,
+    img: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1200&auto=format",
+    location: "Ooty",
+    title: "Tea Gardens & Scenic Hills",
+    rating: 4.6,
+    reviews: 190,
+    duration: 3,
+    price: 6500,
+    tags: ["Nature", "Hills"],
+    type: "Family",
+    popularity: 80,
+  },
+  {
+    id: 13,
+    img: "https://images.unsplash.com/photo-1526779259212-939e64788e3c?q=80&w=1200&auto=format",
+    location: "Darjeeling",
+    title: "Toy Train & Tea Estates",
+    rating: 4.7,
+    reviews: 210,
+    duration: 4,
+    price: 7000,
+    tags: ["Tea", "Mountains"],
+    type: "Family",
+    popularity: 83,
+  },
+  {
+    id: 14,
+    img: "https://images.unsplash.com/photo-1483683804023-6ccdb62f86ef?q=80&w=1200&auto=format",
+    location: "Kashmir",
+    title: "Paradise on Earth Experience",
+    rating: 5.0,
+    reviews: 390,
+    duration: 6,
+    price: 14000,
+    tags: ["Snow", "Nature"],
+    type: "Honeymoon",
+    popularity: 99,
+  },
+  {
+    id: 15,
+    img: "https://images.unsplash.com/photo-1593696140826-c58b021acf8b?q=80&w=1200&auto=format",
+    location: "Mysore",
+    title: "Palaces & Heritage Walk",
+    rating: 4.6,
+    reviews: 150,
+    duration: 2,
+    price: 5500,
+    tags: ["Heritage", "Culture"],
+    type: "Weekend",
+    popularity: 78,
   },
 ];
 
@@ -223,7 +262,10 @@ const TripCard = ({ t }: { t: Trip }) => (
       <img
         src={t.img}
         alt={t.title}
-        loading="lazy"
+        onError={(e: any) => {
+          e.currentTarget.src =
+            "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1200&auto=format";
+        }}
         className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
       />
       <div className="absolute inset-0 bg-gradient-to-t from-foreground/60 via-transparent to-transparent opacity-80" />
@@ -265,7 +307,7 @@ const TripCard = ({ t }: { t: Trip }) => (
         <span className="text-foreground">
           <span className="text-xs text-muted-foreground">from </span>
           <span className="font-display text-lg font-bold text-foreground">
-            ${t.price.toLocaleString()}
+            ₹{t.price.toLocaleString()}
           </span>
         </span>
       </div>
@@ -274,6 +316,13 @@ const TripCard = ({ t }: { t: Trip }) => (
         <Button variant="default" className="group/btn w-full rounded-xl">
           View Details
           <ArrowUpRight className="h-4 w-4 transition-transform group-hover/btn:-translate-y-0.5 group-hover/btn:translate-x-0.5" />
+        </Button>
+        <Button
+          variant="outline"
+          className="w-full mt-2"
+          onClick={() => (window.location.href = `/my-trips/${t.id}`)}
+        >
+          🚀 Start Trip
         </Button>
       </Link>
     </div>
@@ -307,7 +356,9 @@ const FiltersPanel = ({
         <Input
           placeholder="Where to?"
           value={filters.destination}
-          onChange={(e) => setFilters({ ...filters, destination: e.target.value })}
+          onChange={(e) =>
+            setFilters({ ...filters, destination: e.target.value })
+          }
           className="rounded-xl pl-9"
         />
       </div>
@@ -319,13 +370,13 @@ const FiltersPanel = ({
           Budget
         </Label>
         <span className="text-xs font-semibold text-foreground">
-          ${filters.budget[0]} – ${filters.budget[1]}
+          ₹{filters.budget[0]} – ₹{filters.budget[1]}
         </span>
       </div>
       <Slider
         value={filters.budget}
         min={0}
-        max={3000}
+        max={20000}
         step={50}
         onValueChange={(v) =>
           setFilters({ ...filters, budget: [v[0], v[1]] as [number, number] })
@@ -411,7 +462,7 @@ const FiltersPanel = ({
 const Explore = () => {
   const initial: Filters = {
     destination: "",
-    budget: [0, 3000],
+    budget: [0, 20000],
     duration: "any",
     types: [],
     minRating: 0,
@@ -428,7 +479,8 @@ const Explore = () => {
         !t.location.toLowerCase().includes(filters.destination.toLowerCase())
       )
         return false;
-      if (t.price < filters.budget[0] || t.price > filters.budget[1]) return false;
+      if (t.price < filters.budget[0] || t.price > filters.budget[1])
+        return false;
       if (filters.duration === "short" && t.duration > 4) return false;
       if (filters.duration === "medium" && (t.duration < 5 || t.duration > 7))
         return false;
@@ -438,18 +490,24 @@ const Explore = () => {
       return true;
     });
 
-    if (sort === "price-asc") list = [...list].sort((a, b) => a.price - b.price);
-    else if (sort === "rating") list = [...list].sort((a, b) => b.rating - a.rating);
+    if (sort === "price-asc")
+      list = [...list].sort((a, b) => a.price - b.price);
+    else if (sort === "rating")
+      list = [...list].sort((a, b) => b.rating - a.rating);
     else list = [...list].sort((a, b) => b.popularity - a.popularity);
 
     return list;
   }, [filters, sort]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  if (page > totalPages) {
+    setPage(1);
+  }
+
   const currentPage = Math.min(page, totalPages);
   const pageSlice = filtered.slice(
     (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
+    currentPage * PAGE_SIZE,
   );
 
   const reset = () => {
@@ -471,11 +529,13 @@ const Explore = () => {
               Explore trips
             </span>
             <h1 className="mt-5 text-balance font-display text-4xl font-extrabold leading-[1.05] tracking-[-0.025em] sm:text-5xl lg:text-6xl">
-              Find your next <span className="text-gradient">unforgettable trip</span>
+              Find your next{" "}
+              <span className="text-gradient">unforgettable trip</span>
             </h1>
             <p className="mt-5 max-w-2xl text-pretty text-lg text-muted-foreground">
-              Curated, traveler-loved itineraries across every budget and vibe. Filter by destination,
-              duration, or style — then book with friends.
+              Curated, traveler-loved itineraries across every budget and vibe.
+              Filter by destination, duration, or style — then book with
+              friends.
             </p>
           </div>
         </div>
@@ -504,19 +564,31 @@ const Explore = () => {
             <main>
               <div className="mb-6 flex items-center justify-between gap-3">
                 <p className="text-sm text-muted-foreground">
-                  <span className="font-semibold text-foreground">{filtered.length}</span> trips found
+                  <span className="font-semibold text-foreground">
+                    {filtered.length}
+                  </span>{" "}
+                  trips found
                 </p>
                 <div className="flex items-center gap-2">
                   <Sheet>
                     <SheetTrigger asChild>
-                      <Button variant="outline" size="sm" className="rounded-xl lg:hidden">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="rounded-xl lg:hidden"
+                      >
                         <Filter className="h-4 w-4" />
                         Filters
                       </Button>
                     </SheetTrigger>
-                    <SheetContent side="left" className="w-[320px] overflow-y-auto sm:w-[380px]">
+                    <SheetContent
+                      side="left"
+                      className="w-[320px] overflow-y-auto sm:w-[380px]"
+                    >
                       <SheetHeader>
-                        <SheetTitle className="font-display">Filters</SheetTitle>
+                        <SheetTitle className="font-display">
+                          Filters
+                        </SheetTitle>
                       </SheetHeader>
                       <div className="mt-6">
                         <FiltersPanel
@@ -537,7 +609,9 @@ const Explore = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="popular">Most popular</SelectItem>
-                      <SelectItem value="price-asc">Price: low to high</SelectItem>
+                      <SelectItem value="price-asc">
+                        Price: low to high
+                      </SelectItem>
                       <SelectItem value="rating">Top rated</SelectItem>
                     </SelectContent>
                   </Select>
@@ -558,7 +632,11 @@ const Explore = () => {
                   <p className="mt-2 text-muted-foreground">
                     Try widening your budget or clearing some filters.
                   </p>
-                  <Button variant="outline" className="mt-5 rounded-xl" onClick={reset}>
+                  <Button
+                    variant="outline"
+                    className="mt-5 rounded-xl"
+                    onClick={reset}
+                  >
                     Reset filters
                   </Button>
                 </div>

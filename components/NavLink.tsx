@@ -5,16 +5,31 @@ import { usePathname } from "next/navigation";
 import { forwardRef } from "react";
 import { cn } from "@/lib/utils";
 
-interface NavLinkCompatProps extends LinkProps {
+interface NavLinkProps extends LinkProps {
   className?: string;
   activeClassName?: string;
   children: React.ReactNode;
 }
 
-const NavLink = forwardRef<HTMLAnchorElement, NavLinkCompatProps>(
-  ({ className, activeClassName, href, children, ...props }, ref) => {
+const NavLink = forwardRef<HTMLAnchorElement, NavLinkProps>(
+  (
+    {
+      className,
+      activeClassName = "text-primary font-semibold", // ✅ default
+      href,
+      children,
+      ...props
+    },
+    ref
+  ) => {
     const pathname = usePathname();
-    const isActive = pathname === href;
+
+    // ✅ handle string href only
+    const hrefString = typeof href === "string" ? href : href.pathname || "";
+
+    // ✅ support nested routes
+    const isActive =
+      pathname === hrefString || pathname.startsWith(hrefString + "/");
 
     return (
       <Link

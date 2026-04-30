@@ -1,230 +1,80 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Compass, Menu, X, LogOut } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { UserButton } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 
-const publicLinks = [
-  { label: "Home", href: "/" },
-  { label: "Explore", href: "/explore" },
-  { label: "Buddies", href: "/buddies" },
-  { label: "Expenses", href: "/expenses" },
+const navLinks = [
+  { name: "Home", href: "/" },
+  { name: "Explore", href: "/explore" },
+  { name: "Buddies", href: "/buddies" },
+  { name: "Expenses", href: "/expenses" },
+  { name: "Dashboard", href: "/dashboard" },
 ];
 
-type User = {
-  id: string;
-  email: string;
-} | null;
-
-export const Navbar = () => {
+export default function Navbar() {
   const pathname = usePathname();
 
-  const [open, setOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const [user, setUser] = useState<User>(null);
-  const [hasTrips, setHasTrips] = useState<boolean | null>(null);
-
-  const links = user
-    ? [...publicLinks, { label: "Dashboard", href: "/dashboard" }]
-    : publicLinks;
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 10);
-    onScroll();
-    window.addEventListener("scroll", onScroll);
-
-    const init = async () => {
-      try {
-        const res = await fetch("/api/auth/me");
-        const data = res.ok ? await res.json() : null;
-        setUser(data?.user || null);
-
-        if (data?.user) {
-          const tripRes = await fetch("/api/trips");
-          const tripData = await tripRes.json();
-          setHasTrips((tripData?.trips || []).length > 0);
-        } else {
-          setHasTrips(false);
-        }
-      } catch {
-        setUser(null);
-        setHasTrips(false);
-      }
-    };
-
-    init();
-
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    setUser(null);
-    setHasTrips(false);
-    window.location.href = "/login";
-  };
-
   return (
-    <header
-      className={cn(
-        "fixed inset-x-0 top-0 z-50 transition-all duration-300",
-        scrolled
-          ? "border-b border-border/60 bg-background/80 backdrop-blur-xl"
-          : "bg-transparent"
-      )}
-    >
-      <div className="container flex h-20 items-center justify-between">
-        {/* LOGO */}
-        <Link href="/" className="flex items-center gap-2">
-          <span className="grid h-10 w-10 place-items-center rounded-xl gradient-hero shadow-glow">
-            <Compass className="h-5 w-5 text-primary-foreground" />
-          </span>
-          <span className="font-display text-lg font-bold">
-            TravelBuddy
-          </span>
-        </Link>
+    <header className="fixed top-0 left-0 w-full z-50">
+      <div className="container py-4">
 
-        {/* NAV LINKS */}
-        <nav className="hidden items-center gap-8 md:flex">
-          {links.map((link) => {
-            const isActive = pathname === link.href;
+        {/* GLASS NAVBAR */}
+        <div className="flex items-center justify-between px-6 py-3 rounded-2xl glass shadow-soft backdrop-blur-xl">
 
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={cn(
-                  "relative text-sm font-medium transition-all duration-300",
-                  "after:absolute after:left-0 after:-bottom-1 after:h-[2px] after:w-0 after:bg-primary after:transition-all after:duration-300",
-                  "hover:after:w-full hover:text-foreground hover:drop-shadow-[0_0_6px_hsl(var(--primary)/0.4)]",
-                  isActive
-                    ? "text-foreground after:w-full"
-                    : "text-foreground/70"
-                )}
-              >
-                {link.label}
-              </Link>
-            );
-          })}
-        </nav>
+          {/* LOGO */}
+          <Link href="/" className="flex items-center gap-2">
+            <div className="h-9 w-9 rounded-xl gradient-hero flex items-center justify-center text-white font-bold shadow-glow">
+              T
+            </div>
+            <span className="font-bold text-lg tracking-tight">
+              TravelBuddy
+            </span>
+          </Link>
 
-        {/* RIGHT SIDE */}
-        <div className="hidden items-center gap-6 md:flex">
-          {user ? (
-            <>
-              {/* 🔥 SMART TRIP LINK */}
-              {hasTrips !== null && (
+          {/* NAV LINKS */}
+          <nav className="hidden md:flex items-center gap-8">
+            {navLinks.map((link) => {
+              const active = pathname === link.href;
+
+              return (
                 <Link
-                  href={hasTrips ? "/trips" : "/planner"}
+                  key={link.href}
+                  href={link.href}
                   className={cn(
-                    "relative text-sm font-medium transition-all duration-300",
-                    "after:absolute after:left-0 after:-bottom-1 after:h-[2px] after:w-0 after:bg-primary after:transition-all after:duration-300",
-                    "hover:after:w-full hover:text-foreground hover:drop-shadow-[0_0_6px_hsl(var(--primary)/0.4)]",
-                    pathname === (hasTrips ? "/trips" : "/planner")
-                      ? "text-foreground after:w-full"
-                      : "text-foreground/70"
+                    "relative text-sm font-medium transition-all duration-200",
+                    active
+                      ? "text-primary"
+                      : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  {hasTrips ? "My Trips" : "Plan Trip"}
+                  {link.name}
+
+                  {/* ACTIVE UNDERLINE */}
+                  {active && (
+                    <span className="absolute -bottom-1 left-0 w-full h-[2px] bg-primary rounded-full" />
+                  )}
                 </Link>
-              )}
+              );
+            })}
+          </nav>
 
-              {/* EMAIL */}
-              <span className="max-w-[140px] truncate text-sm text-muted-foreground">
-                {user.email}
-              </span>
+          {/* RIGHT SIDE */}
+          <div className="flex items-center gap-4">
 
-              {/* LOGOUT */}
-              <Button
-                variant="outline"
-                size="sm"
-                className="rounded-xl"
-                onClick={handleLogout}
-              >
-                <LogOut className="h-4 w-4 mr-1" />
-                Logout
-              </Button>
-            </>
-          ) : (
-            <>
-              <Link href="/login">
-                <Button variant="ghost" size="sm" className="rounded-xl">
-                  Login
-                </Button>
-              </Link>
+            <Link
+              href="/trips"
+              className="hidden md:block text-sm text-muted-foreground hover:text-foreground transition-all"
+            >
+              My Trips
+            </Link>
 
-              <Link href="/signup">
-                <Button variant="hero" size="sm" className="rounded-xl">
-                  Sign Up
-                </Button>
-              </Link>
-            </>
-          )}
-        </div>
-
-        {/* MOBILE BUTTON */}
-        <button
-          className="grid h-10 w-10 place-items-center rounded-xl border border-border/60 bg-card md:hidden"
-          onClick={() => setOpen((v) => !v)}
-        >
-          {open ? <X /> : <Menu />}
-        </button>
-      </div>
-
-      {/* MOBILE MENU */}
-      {open && (
-        <div className="border-t border-border/60 bg-background/95 backdrop-blur-xl md:hidden">
-          <div className="container flex flex-col gap-3 py-4">
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="rounded-xl px-3 py-2 text-sm hover:bg-secondary"
-                onClick={() => setOpen(false)}
-              >
-                {link.label}
-              </Link>
-            ))}
-
-            {user && hasTrips !== null && (
-              <Link
-                href={hasTrips ? "/trips" : "/planner"}
-                onClick={() => setOpen(false)}
-              >
-                <Button className="w-full rounded-xl">
-                  {hasTrips ? "My Trips" : "Plan Trip"}
-                </Button>
-              </Link>
-            )}
-
-            {user ? (
-              <>
-                <div className="text-sm text-muted-foreground px-2">
-                  {user.email}
-                </div>
-                <Button
-                  className="w-full mt-2"
-                  onClick={handleLogout}
-                >
-                  Logout
-                </Button>
-              </>
-            ) : (
-              <div className="flex gap-2">
-                <Link href="/login" className="flex-1">
-                  <Button className="w-full">Login</Button>
-                </Link>
-                <Link href="/signup" className="flex-1">
-                  <Button className="w-full">Sign Up</Button>
-                </Link>
-              </div>
-            )}
+            {/* ✅ FIXED (no error) */}
+            <UserButton />
           </div>
         </div>
-      )}
+      </div>
     </header>
   );
-};
+}

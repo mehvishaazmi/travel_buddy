@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,12 +14,18 @@ type TripPlan = { itinerary: DayPlan[]; budget: Record<string, string>; tips?: s
 
 export default function PlanTripPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [destination, setDestination] = useState("");
   const [days, setDays] = useState(3);
   const [budget, setBudget] = useState(5000);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [plan, setPlan] = useState<TripPlan | null>(null);
+
+  useEffect(() => {
+    const dest = searchParams.get("destination");
+    if (dest) setDestination(dest);
+  }, [searchParams]);
 
   async function generateTrip() {
     if (!destination.trim()) return;

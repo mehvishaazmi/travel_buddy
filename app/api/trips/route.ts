@@ -30,7 +30,7 @@ export async function GET() {
 }
 
 
-// 🔹 CREATE TRIP (🔥 FIXED VERSION)
+// 🔹 CREATE TRIP — atomic insert + select, no race condition
 export async function POST(req: Request) {
   try {
     const { userId } = await auth();
@@ -52,43 +52,26 @@ export async function POST(req: Request) {
       );
     }
 
-    // 🔥 INSERT ONLY (NO .single() here)
-    const { error: insertError } = await supabaseAdmin
-      .from("trips")
-      .insert([
-        {
-          user_id: userId,
-          destination,
-          days,
-          budget,
-          plan,
-        },
-      ]);
-
-    if (insertError) {
-      return NextResponse.json(
-        { error: insertError.message },
-        { status: 500 }
-      );
-    }
-
-    // 🔥 FETCH LATEST INSERTED TRIP (GUARANTEED)
+    // Single atomic operation — insert and get the new row back immediately
     const { data, error } = await supabaseAdmin
       .from("trips")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(1)
+      .insert({
+        user_id: userId,
+        destination,
+        days,
+        budget,
+        plan,
+      })
+      .select()
       .single();
 
     if (error || !data) {
       return NextResponse.json(
-        { error: "Trip created but ID fetch failed" },
+        { error: error?.message ?? "Failed to create trip" },
         { status: 500 }
       );
     }
 
-    // ✅ ALWAYS RETURNS VALID ID
     return NextResponse.json({
       message: "Trip created",
       trip: data,

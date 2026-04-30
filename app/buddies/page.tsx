@@ -621,6 +621,7 @@ export default function Buddies() {
                     );
                   })}
 
+                  {sendingMsg && (
                   <div className="flex justify-start">
                     <div className="rounded-2xl rounded-tl-sm bg-card border border-border/60 px-4 py-2.5 shadow-soft inline-flex gap-1">
                       <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce" />
@@ -628,6 +629,7 @@ export default function Buddies() {
                       <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: "0.3s" }} />
                     </div>
                   </div>
+                  )}
                 </div>
 
                 {/* Trip request card */}

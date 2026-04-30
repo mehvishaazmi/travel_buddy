@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import Navbar from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -256,7 +257,7 @@ const TRIPS: Trip[] = [
 const TYPES = ["Adventure", "Honeymoon", "Family", "Weekend"] as const;
 const PAGE_SIZE = 6;
 
-const TripCard = ({ t }: { t: Trip }) => (
+const TripCard = ({ t, onStart }: { t: Trip; onStart: (t: Trip) => void }) => (
   <article className="group card-premium flex flex-col overflow-hidden">
     <div className="relative aspect-[4/3] overflow-hidden">
       <img
@@ -312,19 +313,21 @@ const TripCard = ({ t }: { t: Trip }) => (
         </span>
       </div>
 
-      <Link href={`/trips/${t.id}`} className="mt-5">
-        <Button variant="default" className="group/btn w-full rounded-xl">
-          View Details
-          <ArrowUpRight className="h-4 w-4 transition-transform group-hover/btn:-translate-y-0.5 group-hover/btn:translate-x-0.5" />
-        </Button>
+      <div className="mt-5 space-y-2">
+        <Link href={`/plan-trip?destination=${encodeURIComponent(t.location)}`}>
+          <Button variant="default" className="group/btn w-full rounded-xl">
+            Plan This Trip
+            <ArrowUpRight className="h-4 w-4 transition-transform group-hover/btn:-translate-y-0.5 group-hover/btn:translate-x-0.5" />
+          </Button>
+        </Link>
         <Button
           variant="outline"
-          className="w-full mt-2"
-          onClick={() => (window.location.href = `/my-trips/${t.id}`)}
+          className="w-full rounded-xl"
+          onClick={() => onStart(t)}
         >
           🚀 Start Trip
         </Button>
-      </Link>
+      </div>
     </div>
   </article>
 );
@@ -460,6 +463,7 @@ const FiltersPanel = ({
 );
 
 const Explore = () => {
+  const router = useRouter();
   const initial: Filters = {
     destination: "",
     budget: [0, 20000],
@@ -468,9 +472,13 @@ const Explore = () => {
     minRating: 0,
   };
 
-  const [filters, setFilters] = useState<Filters>(initial);
+ const [filters, setFilters] = useState<Filters>(initial);
   const [sort, setSort] = useState("popular");
   const [page, setPage] = useState(1);
+
+  function handleStart(t: Trip) {
+    router.push(`/plan-trip?destination=${encodeURIComponent(t.location)}`);
+  }
 
   const filtered = useMemo(() => {
     let list = TRIPS.filter((t) => {
@@ -621,7 +629,7 @@ const Explore = () => {
               {pageSlice.length ? (
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
                   {pageSlice.map((t) => (
-                    <TripCard key={t.id} t={t} />
+                    <TripCard key={t.id} t={t} onStart={handleStart} />
                   ))}
                 </div>
               ) : (

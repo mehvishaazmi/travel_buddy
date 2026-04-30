@@ -1,71 +1,76 @@
 import { NextResponse } from "next/server";
+import Groq from "groq-sdk";
 
-const randomPick = (arr: string[]) =>
-  arr[Math.floor(Math.random() * arr.length)];
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 export async function POST(req: Request) {
   try {
     const { destination, days, budget } = await req.json();
 
-    await new Promise((res) => setTimeout(res, 1200)); // delay
+    if (!destination || !days || !budget) {
+      return NextResponse.json(
+        { error: "Missing destination, days or budget" },
+        { status: 400 }
+      );
+    }
 
-    const placesPool = [
-      "Beach",
-      "Fort",
-      "Temple",
-      "Market",
-      "Museum",
-      "Waterfall",
-      "Cafe",
-      "Viewpoint",
-    ];
+    const prompt = `You are a travel planning assistant. Create a detailed ${days}-day trip plan for ${destination} with a total budget of ₹${budget}.
 
-    const activitiesPool = [
-      "Explore local attractions",
-      "Try street food",
-      "Take photos",
-      "Shopping",
-      "Relax at scenic spot",
-      "Enjoy nightlife",
-    ];
+Return ONLY a valid JSON object with this exact structure (no markdown, no extra text):
+{
+  "itinerary": [
+    {
+      "day": 1,
+      "title": "Day title",
+      "activities": ["activity 1", "activity 2", "activity 3"]
+    }
+  ],
+  "budget": {
+    "hotel": "₹XXXX",
+    "food": "₹XXXX",
+    "transport": "₹XXXX",
+    "activities": "₹XXXX"
+  },
+  "places": ["place 1", "place 2", "place 3", "place 4", "place 5"],
+  "tips": ["tip 1", "tip 2", "tip 3", "tip 4"]
+}
 
-    const itinerary = Array.from({ length: Number(days) }, (_, i) => ({
-      day: i + 1,
-      title:
-        i === 0
-          ? "Arrival & Check-in"
-          : randomPick([
-              "Adventure Day",
-              "Exploration Day",
-              "Relax & Enjoy",
-            ]),
-      activities: Array.from({ length: 3 }, () =>
-        randomPick(activitiesPool)
-      ),
-    }));
+Rules:
+- Budget values must add up to roughly ₹${budget}
+- Activities should be specific to ${destination}
+- Places should be real attractions in ${destination}
+- Tips should be practical and specific to ${destination}
+- Return ONLY the JSON, nothing else`;
 
-    const plan = {
-      itinerary,
-      budget: {
-        hotel: `₹${Math.floor(budget * 0.4)}`,
-        food: `₹${Math.floor(budget * 0.2)}`,
-        transport: `₹${Math.floor(budget * 0.2)}`,
-        activities: `₹${Math.floor(budget * 0.2)}`,
-      },
-      places: Array.from({ length: 5 }, () =>
-        `${destination} ${randomPick(placesPool)}`
-      ),
-      tips: [
-        "Carry sunscreen",
-        "Book tickets early",
-        "Keep emergency cash",
-        "Stay hydrated",
-      ],
-    };
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.7,
+      max_tokens: 2000,
+    });
+
+    const text = completion.choices[0]?.message?.content ?? "";
+
+    const cleaned = text.replace(/```json|```/g, "").trim();
+
+    let plan;
+    try {
+      plan = JSON.parse(cleaned);
+    } catch {
+      console.error("Groq JSON parse failed:", cleaned);
+      return NextResponse.json(
+        { error: "AI returned invalid JSON. Please try again." },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ plan });
 
-  } catch {
-    return NextResponse.json({ error: "Mock AI failed" }, { status: 500 });
+  } catch (err: any) {
+    console.error("Groq API error:", err);
+    return NextResponse.json(
+      { error: err?.message ?? "AI request failed" },
+      { status: 500 }
+    );
   }
 }

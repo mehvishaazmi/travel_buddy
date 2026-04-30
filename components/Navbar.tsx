@@ -19,6 +19,8 @@ const navLinks = [
 export default function Navbar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Add this line — useAuth is already imported, just destructure it:
+  const { isSignedIn } = useAuth();
 
   return (
     <header className="fixed top-0 left-0 w-full z-50">

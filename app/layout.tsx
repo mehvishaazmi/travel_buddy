@@ -1,42 +1,83 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import { ClerkProvider } from "@clerk/nextjs";
-import { Toaster } from "sonner"; // ✅ added
+import type {
+  Metadata,
+} from "next";
+
+import Script from "next/script";
+
+import {
+  Geist,
+  Geist_Mono,
+} from "next/font/google";
+
+import {
+  ClerkProvider,
+} from "@clerk/nextjs";
+
+import { Toaster } from "sonner";
+
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+const geistSans =
+  Geist({
+    variable:
+      "--font-geist-sans",
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+    subsets: [
+      "latin",
+    ],
+  });
 
-export const metadata: Metadata = {
-  title: "TravelBuddy",
-  description: "AI-powered travel planning platform",
-};
+const geistMono =
+  Geist_Mono({
+    variable:
+      "--font-geist-mono",
+
+    subsets: [
+      "latin",
+    ],
+  });
+
+export const metadata:
+  Metadata = {
+    title:
+      "TravelBuddy",
+
+    description:
+      "AI-powered travel planning platform",
+  };
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children:
+    React.ReactNode;
 }) {
+
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+
         <ClerkProvider>
+
           {children}
 
-          {/* ✅ Global Toast System */}
-          <Toaster richColors position="top-right" />
+          {/* GLOBAL TOASTS */}
+          <Toaster
+            richColors
+            position="top-right"
+          />
 
         </ClerkProvider>
+
+        {/* RAZORPAY */}
+        <Script
+          src="https://checkout.razorpay.com/v1/checkout.js"
+          strategy="lazyOnload"
+        />
+
       </body>
     </html>
   );

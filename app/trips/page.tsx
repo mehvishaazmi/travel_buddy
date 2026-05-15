@@ -1,116 +1,783 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  useRouter,
+} from "next/navigation";
+
+import {
+  useUser,
+} from "@clerk/nextjs";
+
+import {
+  createClient,
+  RealtimeChannel,
+} from "@supabase/supabase-js";
+
 import Navbar from "@/components/Navbar";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Loader2, MapPin, Clock, Wallet, Plus } from "lucide-react";
-import { createClient } from "@supabase/supabase-js";
-import { useUser } from "@clerk/nextjs";
+
 import { Footer } from "@/components/Footer";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { Button } from "@/components/ui/button";
+
+import {
+  Loader2,
+  MapPin,
+  Clock,
+  Wallet,
+  Plus,
+  Users,
+  Receipt,
+  ArrowRight,
+} from "lucide-react";
+
+const supabase =
+  createClient(
+    process.env
+      .NEXT_PUBLIC_SUPABASE_URL!,
+
+    process.env
+      .NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
 
 type Trip = {
   id: string;
+
   destination: string;
+
   days: string;
+
   budget: string;
+
   created_at: string;
+
   plan?: any;
 };
 
-const getImage = (destination: string) =>
-  `https://picsum.photos/seed/${destination.replace(/\s/g, "")}/800/500`;
+type TripWithMembers =
+  Trip & {
+    membersCount: number;
+  };
+
+const getImage = (
+  destination: string,
+) =>
+  `https://picsum.photos/seed/${destination.replace(
+    /\s/g,
+    "",
+  )}/1200/700`;
 
 export default function TripsPage() {
-  const { user } = useUser();
-  const router = useRouter();
-  const [trips, setTrips] = useState<Trip[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  const {
+    user,
+    isLoaded,
+  } = useUser();
+
+  const router =
+    useRouter();
+
+  const [trips, setTrips] =
+    useState<
+      TripWithMembers[]
+    >([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [error, setError] =
+    useState("");
+
+  // ====================================
+  // REALTIME
+  // ====================================
 
   useEffect(() => {
-    if (!user?.id) return;
-    fetchTrips();
+
+    let channel:
+      RealtimeChannel;
+
+    if (user?.id) {
+
+      channel =
+        supabase
+          .channel(
+            `user-trips-${user.id}`,
+          )
+
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+
+              schema:
+                "public",
+
+              table:
+                "trip_members",
+            },
+
+            async () => {
+
+              await fetchTrips();
+            },
+          )
+
+          .subscribe();
+    }
+
+    return () => {
+
+      if (channel) {
+
+        supabase.removeChannel(
+          channel,
+        );
+      }
+    };
+
   }, [user?.id]);
 
+  // ====================================
+  // FETCH
+  // ====================================
+
+  useEffect(() => {
+
+    if (!isLoaded)
+      return;
+
+    if (!user?.id) {
+
+      router.push(
+        "/sign-in",
+      );
+
+      return;
+    }
+
+    fetchTrips();
+
+  }, [
+    user?.id,
+    isLoaded,
+  ]);
+
+  // ====================================
+  // FETCH TRIPS
+  // ====================================
+
   async function fetchTrips() {
-    setLoading(true);
-    const { data } = await supabase
-      .from("trips")
-      .select("*")
-      .eq("user_id", user!.id)
-      .order("created_at", { ascending: false });
-    setTrips(data ?? []);
-    setLoading(false);
+
+    try {
+
+      setLoading(true);
+
+      setError("");
+
+      // ====================================
+      // GET USER MEMBERSHIPS
+      // ====================================
+
+      const {
+        data:
+          memberships,
+        error:
+          membershipError,
+      } = await supabase
+        .from(
+          "trip_members",
+        )
+        .select(
+          "trip_id",
+        )
+        .eq(
+          "user_id",
+          user?.id,
+        );
+
+      if (
+        membershipError
+      ) {
+
+        console.error(
+          membershipError,
+        );
+
+        setError(
+          "Failed to load trips",
+        );
+
+        return;
+      }
+
+      const tripIds =
+        memberships?.map(
+          (
+            m,
+          ) => m.trip_id,
+        ) || [];
+
+      // NO TRIPS
+      if (
+        tripIds.length === 0
+      ) {
+
+        setTrips([]);
+
+        return;
+      }
+
+      // ====================================
+      // GET TRIPS
+      // ====================================
+
+      const {
+        data:
+          tripsData,
+        error:
+          tripsError,
+      } = await supabase
+        .from("trips")
+        .select("*")
+        .in(
+          "id",
+          tripIds,
+        )
+        .order(
+          "created_at",
+          {
+            ascending: false,
+          },
+        );
+
+      if (
+        tripsError
+      ) {
+
+        console.error(
+          tripsError,
+        );
+
+        setError(
+          "Failed to load trips",
+        );
+
+        return;
+      }
+
+      const safeTrips =
+        tripsData || [];
+
+      // ====================================
+      // GET ALL MEMBER COUNTS
+      // ====================================
+
+      const {
+        data:
+          allMembers,
+      } = await supabase
+        .from(
+          "trip_members",
+        )
+        .select(
+          "trip_id",
+        )
+        .in(
+          "trip_id",
+          tripIds,
+        );
+
+      // COUNT MAP
+      const countMap:
+        Record<
+          string,
+          number
+        > = {};
+
+      (
+        allMembers ||
+        []
+      ).forEach(
+        (
+          member,
+        ) => {
+
+          countMap[
+            member.trip_id
+          ] =
+            (countMap[
+              member.trip_id
+            ] || 0) +
+            1;
+        },
+      );
+
+      // ENRICH
+      const enrichedTrips =
+        safeTrips.map(
+          (
+            trip,
+          ) => ({
+            ...trip,
+
+            membersCount:
+              countMap[
+                trip.id
+              ] || 1,
+          }),
+        );
+
+      setTrips(
+        enrichedTrips,
+      );
+
+    } catch (err) {
+
+      console.error(
+        err,
+      );
+
+      setError(
+        "Something went wrong",
+      );
+
+    } finally {
+
+      setLoading(false);
+    }
+  }
+
+  // ====================================
+  // STATS
+  // ====================================
+
+  const totalBudget =
+    trips.reduce(
+      (
+        sum,
+        trip,
+      ) =>
+        sum +
+        Number(
+          trip.budget,
+        ),
+
+      0,
+    );
+
+  const totalMembers =
+    trips.reduce(
+      (
+        sum,
+        trip,
+      ) =>
+        sum +
+        trip.membersCount,
+
+      0,
+    );
+
+  // ====================================
+  // LOADING
+  // ====================================
+
+  if (
+    loading &&
+    trips.length === 0
+  ) {
+
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+
+        <Loader2
+          className="
+            h-10
+            w-10
+            animate-spin
+            text-cyan-500
+          "
+        />
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-cyan-50">
+
       <Navbar />
-      <main className="pt-28 pb-24 container">
-        <div className="flex justify-between items-center mb-10">
+
+      <main className="container pb-24 pt-28">
+
+        {/* HEADER */}
+        <div className="mb-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+
           <div>
-            <h1 className="font-display text-4xl font-bold tracking-tight">Your Trips ✈️</h1>
-            <p className="mt-1 text-muted-foreground text-sm">{trips.length} trip{trips.length !== 1 && "s"} planned</p>
+
+            <h1
+              className="
+                text-5xl
+                font-bold
+                tracking-tight
+                text-slate-900
+              "
+            >
+              Your Trips ✈️
+            </h1>
+
+            <p
+              className="
+                mt-3
+                text-lg
+                text-slate-600
+              "
+            >
+              Manage your adventures,
+              group expenses,
+              and travel members.
+            </p>
           </div>
-          <Button variant="hero" className="rounded-xl shadow-glow" onClick={() => router.push("/plan-trip")}>
-            <Plus className="h-4 w-4" /> Plan New Trip
+
+          <Button
+            className="
+              h-12
+              rounded-2xl
+              bg-cyan-500
+              px-6
+              text-white
+              hover:bg-cyan-600
+            "
+            onClick={() =>
+              router.push(
+                "/plan-trip",
+              )
+            }
+          >
+            <Plus className="mr-2 h-4 w-4" />
+
+            Plan New Trip
           </Button>
         </div>
 
-        {loading && (
-          <div className="flex justify-center py-24">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        )}
+        {/* STATS */}
+        {!loading &&
+          trips.length >
+            0 && (
 
-        {!loading && trips.length === 0 && (
-          <div className="text-center py-24 rounded-3xl border border-dashed border-border">
-            <p className="text-2xl font-semibold">No trips yet 😔</p>
-            <p className="text-muted-foreground mt-2 mb-6">Start planning your first AI-powered trip!</p>
-            <Button variant="hero" className="rounded-xl shadow-glow" onClick={() => router.push("/plan-trip")}>
-              Plan Trip ✨
-            </Button>
-          </div>
-        )}
+            <div className="mb-10 grid gap-6 md:grid-cols-3">
 
-        {!loading && trips.length > 0 && (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {trips.map((trip) => (
-              <div key={trip.id} onClick={() => router.push(`/trips/${trip.id}`)}
-                className="cursor-pointer group rounded-3xl overflow-hidden border border-border/60 bg-card shadow-soft hover:shadow-card hover:-translate-y-1 transition-smooth">
-                <div className="relative h-52 overflow-hidden">
-                  <img src={getImage(trip.destination)} alt={trip.destination}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-foreground/70 via-foreground/20 to-transparent" />
-                  <div className="absolute bottom-4 left-4 text-white">
-                    <div className="flex items-center gap-1 text-xs opacity-80 mb-1">
-                      <MapPin className="h-3 w-3" /> {trip.destination}
+              {/* TRIPS */}
+              <div
+                className="
+                  rounded-3xl
+                  bg-white
+                  p-6
+                  shadow-md
+                "
+              >
+                <p className="text-sm text-slate-500">
+
+                  Total Trips
+                </p>
+
+                <h2 className="mt-2 text-4xl font-bold text-slate-900">
+
+                  {trips.length}
+                </h2>
+              </div>
+
+              {/* BUDGET */}
+              <div
+                className="
+                  rounded-3xl
+                  bg-white
+                  p-6
+                  shadow-md
+                "
+              >
+                <p className="text-sm text-slate-500">
+
+                  Total Budget
+                </p>
+
+                <h2 className="mt-2 text-4xl font-bold text-slate-900">
+
+                  ₹
+                  {totalBudget.toLocaleString()}
+                </h2>
+              </div>
+
+              {/* MEMBERS */}
+              <div
+                className="
+                  rounded-3xl
+                  bg-white
+                  p-6
+                  shadow-md
+                "
+              >
+                <p className="text-sm text-slate-500">
+
+                  Total Members
+                </p>
+
+                <h2 className="mt-2 text-4xl font-bold text-slate-900">
+
+                  {totalMembers}
+                </h2>
+              </div>
+            </div>
+          )}
+
+        {/* ERROR */}
+        {!loading &&
+          error && (
+
+            <div
+              className="
+                rounded-3xl
+                bg-red-50
+                p-8
+                text-center
+              "
+            >
+              <p className="font-medium text-red-600">
+
+                {error}
+              </p>
+            </div>
+          )}
+
+        {/* EMPTY */}
+        {!loading &&
+          trips.length ===
+            0 && (
+
+            <div
+              className="
+                rounded-3xl
+                border
+                border-dashed
+                border-slate-300
+                bg-white
+                py-24
+                text-center
+              "
+            >
+              <h2 className="text-3xl font-bold text-slate-900">
+
+                No trips yet 😔
+              </h2>
+
+              <p className="mt-3 text-slate-500">
+
+                Start planning your
+                first AI-powered trip.
+              </p>
+
+              <Button
+                className="
+                  mt-8
+                  rounded-2xl
+                  bg-cyan-500
+                  px-6
+                  text-white
+                  hover:bg-cyan-600
+                "
+                onClick={() =>
+                  router.push(
+                    "/plan-trip",
+                  )
+                }
+              >
+                Plan Trip ✨
+              </Button>
+            </div>
+          )}
+
+        {/* TRIPS */}
+        {!loading &&
+          trips.length >
+            0 && (
+
+            <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
+
+              {trips.map(
+                (
+                  trip,
+                ) => (
+
+                  <div
+                    key={
+                      trip.id
+                    }
+                    className="
+                      group
+                      overflow-hidden
+                      rounded-3xl
+                      border
+                      border-slate-200
+                      bg-white
+                      shadow-md
+                      transition-all
+                      duration-300
+                      hover:-translate-y-1
+                      hover:shadow-xl
+                    "
+                  >
+
+                    {/* IMAGE */}
+                    <div className="relative h-56 overflow-hidden">
+
+                      <img
+                        src={getImage(
+                          trip.destination,
+                        )}
+                        alt={
+                          trip.destination
+                        }
+                        className="
+                          h-full
+                          w-full
+                          object-cover
+                          transition-transform
+                          duration-700
+                          group-hover:scale-110
+                        "
+                      />
+
+                      <div
+                        className="
+                          absolute
+                          inset-0
+                          bg-gradient-to-t
+                          from-black/70
+                          via-black/10
+                          to-transparent
+                        "
+                      />
+
+                      <div className="absolute bottom-5 left-5 text-white">
+
+                        <div className="flex items-center gap-2 text-sm opacity-90">
+
+                          <MapPin className="h-4 w-4" />
+
+                          {
+                            trip.destination
+                          }
+                        </div>
+
+                        <h2 className="mt-2 text-3xl font-bold">
+
+                          {
+                            trip.destination
+                          }
+                        </h2>
+                      </div>
+                    </div>
+
+                    {/* CONTENT */}
+                    <div className="p-6">
+
+                      {/* INFO */}
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600">
+
+                        <span className="flex items-center gap-1">
+
+                          <Clock className="h-4 w-4" />
+
+                          {trip.days} days
+                        </span>
+
+                        <span className="flex items-center gap-1">
+
+                          <Wallet className="h-4 w-4" />
+
+                          ₹
+                          {Number(
+                            trip.budget,
+                          ).toLocaleString()}
+                        </span>
+
+                        <span className="flex items-center gap-1">
+
+                          <Users className="h-4 w-4" />
+
+                          {
+                            trip.membersCount
+                          }{" "}
+                          members
+                        </span>
+                      </div>
+
+                      {/* DATE */}
+                      <p className="mt-4 text-xs text-slate-400">
+
+                        Created{" "}
+
+                        {new Date(
+                          trip.created_at,
+                        ).toLocaleDateString(
+                          "en-IN",
+                          {
+                            day: "numeric",
+                            month:
+                              "short",
+                            year:
+                              "numeric",
+                          },
+                        )}
+                      </p>
+
+                      {/* ACTIONS */}
+                      <div className="mt-6 flex gap-3">
+
+                        {/* OPEN */}
+                        <Button
+                          onClick={() =>
+                            router.push(
+                              `/trips/${trip.id}`,
+                            )
+                          }
+                          className="
+                            flex-1
+                            rounded-2xl
+                            bg-cyan-500
+                            text-white
+                            hover:bg-cyan-600
+                          "
+                        >
+                          Open Trip
+
+                          <ArrowRight className="ml-2 h-4 w-4" />
+                        </Button>
+
+                        {/* EXPENSES */}
+                        <Button
+                          variant="outline"
+                          onClick={() =>
+                            router.push(
+                              `/trips/${trip.id}/expenses`,
+                            )
+                          }
+                          className="rounded-2xl"
+                        >
+                          <Receipt className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                  <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md text-white text-xs px-3 py-1 rounded-full opacity-0 group-hover:opacity-100 transition">
-                    View Trip →
-                  </div>
-                </div>
-                <div className="p-5">
-                  <h2 className="font-display font-semibold text-lg">{trip.destination}</h2>
-                  <div className="mt-3 flex items-center gap-4 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1"><Clock className="h-4 w-4" /> {trip.days} days</span>
-                    <span className="flex items-center gap-1"><Wallet className="h-4 w-4" /> ₹{Number(trip.budget).toLocaleString()}</span>
-                  </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Created {new Date(trip.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+                ),
+              )}
+            </div>
+          )}
       </main>
+
       <Footer />
     </div>
   );

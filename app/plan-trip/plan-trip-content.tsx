@@ -2,11 +2,18 @@
 
 import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
-import { useRouter, useSearchParams } from "next/navigation";
+import {
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
+
+import { useUser } from "@clerk/nextjs";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Footer } from "@/components/Footer";
+
 import {
   Loader2,
   MapPin,
@@ -15,9 +22,15 @@ import {
   ChevronRight,
   Sparkles,
 } from "lucide-react";
+
 import { toast } from "sonner";
 
-type DayPlan = { day: number; title: string; activities: string[] };
+type DayPlan = {
+  day: number;
+  title: string;
+  activities: string[];
+};
+
 type TripPlan = {
   itinerary: DayPlan[];
   budget: Record<string, string>;
@@ -26,165 +39,592 @@ type TripPlan = {
 };
 
 export function PlanTripContent() {
+
   const router = useRouter();
+
   const searchParams = useSearchParams();
-  const [destination, setDestination] = useState("");
-  const [days, setDays] = useState(3);
-  const [budget, setBudget] = useState(5000);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [plan, setPlan] = useState<TripPlan | null>(null);
+
+  const { user } = useUser();
+
+  const [destination, setDestination] =
+    useState("");
+
+  const [days, setDays] =
+    useState(3);
+
+  const [budget, setBudget] =
+    useState(5000);
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [saving, setSaving] =
+    useState(false);
+
+  const [plan, setPlan] =
+    useState<TripPlan | null>(null);
+
+  const [error, setError] =
+    useState("");
+
+  // ====================================
+  // PREFILL DESTINATION
+  // ====================================
 
   useEffect(() => {
-    const dest = searchParams.get("destination");
-    if (dest) setDestination(dest);
+
+    const dest =
+      searchParams.get("destination");
+
+    if (dest) {
+      setDestination(dest);
+    }
+
   }, [searchParams]);
 
+  // ====================================
+  // GENERATE TRIP
+  // ====================================
+
   async function generateTrip() {
-    if (!destination.trim()) return;
-    setLoading(true);
-    setPlan(null);
-    try {
-      const res = await fetch("/api/ai/plan-trip", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ destination, days, budget }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setPlan(data.plan);
-    } catch (err) {
-      console.error(err);
+
+    if (!destination.trim()) {
+
+      toast.error(
+        "Please enter a destination",
+      );
+
+      return;
     }
-    setLoading(false);
+
+    if (days < 1 || days > 30) {
+
+      toast.error(
+        "Days must be between 1 and 30",
+      );
+
+      return;
+    }
+
+    if (budget < 500) {
+
+      toast.error(
+        "Budget must be at least ₹500",
+      );
+
+      return;
+    }
+
+    setLoading(true);
+
+    setError("");
+
+    setPlan(null);
+
+    try {
+
+      const res =
+        await fetch(
+          "/api/ai/plan-trip",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body: JSON.stringify({
+              destination,
+              days,
+              budget,
+            }),
+          },
+        );
+
+      const data =
+        await res.json();
+
+      if (!res.ok) {
+
+        const message =
+          data.error ||
+          "Something went wrong";
+
+        setError(message);
+
+        toast.error(message);
+
+        return;
+      }
+
+      setPlan(data.plan);
+
+      toast.success(
+        "Trip generated successfully!",
+      );
+
+    } catch (err) {
+
+      console.error(err);
+
+      const message =
+        "Failed to generate trip.";
+
+      setError(message);
+
+      toast.error(message);
+
+    } finally {
+
+      setLoading(false);
+    }
   }
 
+  // ====================================
+  // SAVE TRIP
+  // ====================================
+
   async function saveTrip() {
+
     if (!plan) return;
-    setSaving(true);
-    try {
-      const res = await fetch("/api/trips", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ destination, days, budget, plan }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      router.push(`/trips/${data.trip.id}`);
-    } catch (err: any) {
-      toast.error(err?.message ?? "Failed to save trip. Please try again.");
+
+    if (!user) {
+
+      toast.error(
+        "Please sign in first",
+      );
+
+      return;
     }
-    setSaving(false);
+
+    setSaving(true);
+
+    try {
+
+      // ====================================
+      // GET BEST POSSIBLE USER NAME
+      // ====================================
+
+      const userName =
+        user.fullName ||
+        user.username ||
+        user.firstName ||
+        user.primaryEmailAddress
+          ?.emailAddress
+          ?.split("@")[0] ||
+        "User";
+
+      // ====================================
+      // SAVE TRIP
+      // ====================================
+
+      const res =
+        await fetch(
+          "/api/trips",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body: JSON.stringify({
+              destination:
+                destination.trim(),
+
+              days,
+
+              budget,
+
+              plan,
+
+              user_name: userName,
+            }),
+          },
+        );
+
+      const data =
+        await res.json();
+
+      if (!res.ok) {
+
+        throw new Error(
+          data.error ||
+          "Failed to save trip",
+        );
+      }
+
+      toast.success(
+        "Trip saved successfully!",
+      );
+
+      router.push(
+        `/trips/${data.trip.id}`,
+      );
+
+    } catch (err: any) {
+
+      console.error(err);
+
+      toast.error(
+        err?.message ||
+          "Failed to save trip",
+      );
+
+    } finally {
+
+      setSaving(false);
+    }
   }
 
   return (
     <div className="min-h-screen bg-background">
+
       <Navbar />
 
-      <section className="pt-28 pb-10 relative overflow-hidden">
+      {/* HERO */}
+      <section
+        className="
+          relative
+          overflow-hidden
+          pt-28
+          pb-10
+        "
+      >
         <div
-          className="absolute inset-0 -z-10 opacity-60"
-          style={{ background: "var(--gradient-mesh)" }}
+          className="
+            absolute
+            inset-0
+            -z-10
+            opacity-60
+          "
+          style={{
+            background:
+              "var(--gradient-mesh)",
+          }}
         />
+
         <div className="container max-w-3xl">
-          <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider">
+
+          <span
+            className="
+              inline-block
+              rounded-full
+              bg-primary/10
+              px-3
+              py-1
+              text-xs
+              font-semibold
+              uppercase
+              tracking-wider
+              text-primary
+            "
+          >
             AI Trip Planner
           </span>
-          <h1 className="mt-4 font-display text-4xl sm:text-5xl font-bold tracking-tight">
-            Plan your trip with <span className="text-gradient">AI ✨</span>
+
+          <h1
+            className="
+              mt-4
+              font-display
+              text-4xl
+              font-bold
+              tracking-tight
+              sm:text-5xl
+            "
+          >
+            Plan your trip with{" "}
+
+            <span className="text-gradient">
+              AI ✨
+            </span>
           </h1>
-          <p className="mt-4 text-lg text-muted-foreground">
-            Tell us where you want to go and we'll build a full itinerary
-            instantly.
+
+          <p
+            className="
+              mt-4
+              text-lg
+              text-muted-foreground
+            "
+          >
+            Tell us where you want to go and
+            AI will generate a complete trip.
           </p>
         </div>
       </section>
 
+      {/* CONTENT */}
       <section className="pb-24">
+
         <div className="container max-w-3xl space-y-6">
-          {/* Input card */}
-          <div className="rounded-3xl border border-border/60 bg-card p-6 shadow-soft space-y-5">
+
+          {/* FORM */}
+          <div
+            className="
+              space-y-5
+              rounded-3xl
+              border
+              border-border/60
+              bg-card
+              p-6
+              shadow-soft
+            "
+          >
+
+            {/* DESTINATION */}
             <div>
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
+
+              <Label
+                className="
+                  mb-2
+                  block
+                  text-xs
+                  font-semibold
+                  uppercase
+                  tracking-wider
+                  text-muted-foreground
+                "
+              >
                 Destination
               </Label>
+
               <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+
+                <MapPin
+                  className="
+                    absolute
+                    left-3
+                    top-1/2
+                    h-4
+                    w-4
+                    -translate-y-1/2
+                    text-muted-foreground
+                  "
+                />
+
                 <Input
-                  placeholder="e.g. Goa, Manali, Bali..."
+                  placeholder="Goa, Bali, Kashmir..."
                   value={destination}
-                  onChange={(e) => setDestination(e.target.value)}
-                  className="pl-9 h-12 rounded-xl"
+                  onChange={(e) =>
+                    setDestination(
+                      e.target.value,
+                    )
+                  }
+                  className="
+                    h-12
+                    rounded-xl
+                    pl-9
+                  "
                 />
               </div>
             </div>
+
+            {/* DAYS + BUDGET */}
             <div className="grid grid-cols-2 gap-4">
+
+              {/* DAYS */}
               <div>
-                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
-                  Number of days
+
+                <Label
+                  className="
+                    mb-2
+                    block
+                    text-xs
+                    font-semibold
+                    uppercase
+                    tracking-wider
+                    text-muted-foreground
+                  "
+                >
+                  Days
                 </Label>
+
                 <div className="relative">
-                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+
+                  <Clock
+                    className="
+                      absolute
+                      left-3
+                      top-1/2
+                      h-4
+                      w-4
+                      -translate-y-1/2
+                      text-muted-foreground
+                    "
+                  />
+
                   <Input
                     type="number"
                     value={days}
                     min={1}
                     max={30}
-                    onChange={(e) => setDays(Number(e.target.value))}
-                    className="pl-9 h-12 rounded-xl"
+                    onChange={(e) =>
+                      setDays(
+                        Number(
+                          e.target.value,
+                        ),
+                      )
+                    }
+                    className="
+                      h-12
+                      rounded-xl
+                      pl-9
+                    "
                   />
                 </div>
               </div>
+
+              {/* BUDGET */}
               <div>
-                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
-                  Budget (₹)
+
+                <Label
+                  className="
+                    mb-2
+                    block
+                    text-xs
+                    font-semibold
+                    uppercase
+                    tracking-wider
+                    text-muted-foreground
+                  "
+                >
+                  Budget
                 </Label>
+
                 <div className="relative">
-                  <Wallet className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+
+                  <Wallet
+                    className="
+                      absolute
+                      left-3
+                      top-1/2
+                      h-4
+                      w-4
+                      -translate-y-1/2
+                      text-muted-foreground
+                    "
+                  />
+
                   <Input
                     type="number"
                     value={budget}
                     min={500}
-                    onChange={(e) => setBudget(Number(e.target.value))}
-                    className="pl-9 h-12 rounded-xl"
+                    onChange={(e) =>
+                      setBudget(
+                        Number(
+                          e.target.value,
+                        ),
+                      )
+                    }
+                    className="
+                      h-12
+                      rounded-xl
+                      pl-9
+                    "
                   />
                 </div>
               </div>
             </div>
+
+            {/* ERROR */}
+            {error && (
+              <div
+                className="
+                  rounded-xl
+                  border
+                  border-red-500/20
+                  bg-red-500/10
+                  p-3
+                  text-sm
+                  text-red-500
+                "
+              >
+                {error}
+              </div>
+            )}
+
+            {/* BUTTON */}
             <Button
               variant="hero"
-              className="w-full h-12 rounded-xl shadow-glow text-base"
+              className="
+                h-12
+                w-full
+                rounded-xl
+                text-base
+                shadow-glow
+              "
               onClick={generateTrip}
-              disabled={loading || !destination.trim()}
+              disabled={
+                loading ||
+                !destination.trim()
+              }
             >
               {loading ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Generating...
+                  <Loader2
+                    className="
+                      h-4
+                      w-4
+                      animate-spin
+                    "
+                  />
+
+                  Generating...
                 </>
               ) : (
                 <>
-                  <Sparkles className="h-4 w-4" /> Generate Plan
+                  <Sparkles className="h-4 w-4" />
+
+                  Generate Plan
                 </>
               )}
             </Button>
           </div>
 
-          {/* Result */}
+          {/* RESULT */}
           {plan && (
             <div className="space-y-5">
-              <div className="flex justify-between items-center">
-                <h2 className="font-display text-2xl font-bold">
+
+              {/* HEADER */}
+              <div
+                className="
+                  flex
+                  items-center
+                  justify-between
+                "
+              >
+                <h2
+                  className="
+                    font-display
+                    text-2xl
+                    font-bold
+                  "
+                >
                   Your plan for {destination}
                 </h2>
+
                 <Button
                   variant="hero"
-                  className="rounded-xl shadow-glow"
+                  className="
+                    rounded-xl
+                    shadow-glow
+                  "
                   onClick={saveTrip}
                   disabled={saving}
                 >
                   {saving ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" /> Saving...
+                      <Loader2
+                        className="
+                          h-4
+                          w-4
+                          animate-spin
+                        "
+                      />
+
+                      Saving...
                     </>
                   ) : (
                     "💾 Save Trip"
@@ -192,87 +632,114 @@ export function PlanTripContent() {
                 </Button>
               </div>
 
-              {/* Itinerary */}
-              <div className="rounded-3xl border border-border/60 bg-card shadow-soft overflow-hidden">
-                <div className="p-5 border-b border-border/60">
-                  <h3 className="font-display font-semibold text-lg">
+              {/* ITINERARY */}
+              <div
+                className="
+                  overflow-hidden
+                  rounded-3xl
+                  border
+                  border-border/60
+                  bg-card
+                  shadow-soft
+                "
+              >
+
+                <div
+                  className="
+                    border-b
+                    border-border/60
+                    p-5
+                  "
+                >
+                  <h3
+                    className="
+                      font-display
+                      text-lg
+                      font-semibold
+                    "
+                  >
                     📅 Itinerary
                   </h3>
                 </div>
+
                 <div className="divide-y divide-border/60">
-                  {plan.itinerary.map((day) => (
-                    <div key={day.day} className="p-5">
-                      <div className="flex items-center gap-3 mb-3">
-                        <span className="h-8 w-8 rounded-full bg-primary/10 text-primary text-xs font-bold grid place-items-center shrink-0">
-                          {day.day}
-                        </span>
-                        <h4 className="font-semibold">
-                          Day {day.day} — {day.title}
-                        </h4>
-                      </div>
-                      <ul className="space-y-1.5 pl-11">
-                        {day.activities.map((a, j) => (
-                          <li
-                            key={j}
-                            className="flex items-center gap-2 text-sm text-foreground/75"
-                          >
-                            <ChevronRight className="h-3.5 w-3.5 text-primary shrink-0" />{" "}
-                            {a}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              </div>
 
-              {/* Budget */}
-              <div className="rounded-3xl border border-border/60 bg-card shadow-soft overflow-hidden">
-                <div className="p-5 border-b border-border/60">
-                  <h3 className="font-display font-semibold text-lg">
-                    💰 Budget breakdown
-                  </h3>
-                </div>
-                <div className="grid grid-cols-2 gap-4 p-5">
-                  {Object.entries(plan.budget).map(([key, value]) => (
-                    <div
-                      key={key}
-                      className="rounded-2xl bg-secondary/50 p-4 text-center"
-                    >
-                      <p className="text-xs text-muted-foreground capitalize">
-                        {key}
-                      </p>
-                      <p className="font-display font-bold text-xl mt-1">
-                        {value}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {plan.tips && (
-                <div className="rounded-3xl border border-border/60 bg-card shadow-soft overflow-hidden">
-                  <div className="p-5 border-b border-border/60">
-                    <h3 className="font-display font-semibold text-lg">
-                      💡 Tips
-                    </h3>
-                  </div>
-                  <ul className="p-5 grid sm:grid-cols-2 gap-3">
-                    {plan.tips.map((tip, i) => (
-                      <li
-                        key={i}
-                        className="flex items-start gap-2 text-sm p-3 rounded-xl bg-primary/5 border border-primary/10"
+                  {plan.itinerary.map(
+                    (day) => (
+                      <div
+                        key={day.day}
+                        className="p-5"
                       >
-                        <span className="text-primary mt-0.5">✓</span> {tip}
-                      </li>
-                    ))}
-                  </ul>
+                        <div
+                          className="
+                            mb-3
+                            flex
+                            items-center
+                            gap-3
+                          "
+                        >
+
+                          <span
+                            className="
+                              grid
+                              h-8
+                              w-8
+                              place-items-center
+                              rounded-full
+                              bg-primary/10
+                              text-xs
+                              font-bold
+                              text-primary
+                            "
+                          >
+                            {day.day}
+                          </span>
+
+                          <h4 className="font-semibold">
+                            Day {day.day} — {day.title}
+                          </h4>
+                        </div>
+
+                        <ul className="space-y-1.5 pl-11">
+
+                          {day.activities.map(
+                            (
+                              activity,
+                              index,
+                            ) => (
+                              <li
+                                key={index}
+                                className="
+                                  flex
+                                  items-center
+                                  gap-2
+                                  text-sm
+                                  text-foreground/75
+                                "
+                              >
+                                <ChevronRight
+                                  className="
+                                    h-3.5
+                                    w-3.5
+                                    text-primary
+                                  "
+                                />
+
+                                {activity}
+                              </li>
+                            ),
+                          )}
+                        </ul>
+                      </div>
+                    ),
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           )}
         </div>
       </section>
+
       <Footer />
     </div>
   );

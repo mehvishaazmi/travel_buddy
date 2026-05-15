@@ -1,15 +1,38 @@
 import { NextResponse } from "next/server";
 import Groq from "groq-sdk";
+import { ratelimit } from "@/lib/ratelimit";
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
+});
 
 export async function POST(req: Request) {
   try {
-    const { destination, days, budget } = await req.json();
+
+    const ip =
+      req.headers.get("x-forwarded-for") ??
+      "anonymous";
+
+    const { success } = await ratelimit.limit(ip);
+
+    if (!success) {
+      return NextResponse.json(
+        {
+          error: "Too many requests. Please try again later.",
+        },
+        { status: 429 }
+      );
+    }
+
+    const { destination, days, budget } =
+      await req.json();
 
     if (!destination || !days || !budget) {
       return NextResponse.json(
-        { error: "Missing destination, days or budget" },
+        {
+          error:
+            "Missing destination, days or budget",
+        },
         { status: 400 }
       );
     }
@@ -42,24 +65,42 @@ Rules:
 - Tips should be practical and specific to ${destination}
 - Return ONLY the JSON, nothing else`;
 
-    const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.7,
-      max_tokens: 2000,
-    });
+    const completion =
+      await groq.chat.completions.create({
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        temperature: 0.7,
+        max_tokens: 2000,
+      });
 
-    const text = completion.choices[0]?.message?.content ?? "";
+    const text =
+      completion.choices[0]?.message?.content ??
+      "";
 
-    const cleaned = text.replace(/```json|```/g, "").trim();
+    const cleaned = text
+      .replace(/```json|```/g, "")
+      .trim();
 
     let plan;
+
     try {
       plan = JSON.parse(cleaned);
     } catch {
-      console.error("Groq JSON parse failed:", cleaned);
+      console.error(
+        "Groq JSON parse failed:",
+        cleaned
+      );
+
       return NextResponse.json(
-        { error: "AI returned invalid JSON. Please try again." },
+        {
+          error:
+            "AI returned invalid JSON. Please try again.",
+        },
         { status: 500 }
       );
     }
@@ -68,8 +109,12 @@ Rules:
 
   } catch (err: any) {
     console.error("Groq API error:", err);
+
     return NextResponse.json(
-      { error: err?.message ?? "AI request failed" },
+      {
+        error:
+          err?.message ?? "AI request failed",
+      },
       { status: 500 }
     );
   }

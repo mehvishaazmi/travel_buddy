@@ -1,86 +1,367 @@
 import { auth } from "@clerk/nextjs/server";
+
 import { NextResponse } from "next/server";
+
+import crypto from "crypto";
+
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
-// 🔹 GET ALL TRIPS
+// ====================================
+// GET USER TRIPS
+// ====================================
+
 export async function GET() {
-  const { userId } = await auth();
 
-  if (!userId) {
-    return NextResponse.json(
-      { error: "Unauthorized" },
-      { status: 401 }
-    );
-  }
-
-  const { data, error } = await supabaseAdmin
-    .from("trips")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    );
-  }
-
-  return NextResponse.json(data);
-}
-
-
-// 🔹 CREATE TRIP — atomic insert + select, no race condition
-export async function POST(req: Request) {
   try {
-    const { userId } = await auth();
+
+    const { userId } =
+      await auth();
 
     if (!userId) {
+
       return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
+        {
+          error:
+            "Unauthorized",
+        },
+        { status: 401 },
       );
     }
 
-    const body = await req.json();
-    const { destination, days, budget, plan } = body;
+    // ====================================
+    // GET MEMBERSHIPS
+    // ====================================
 
-    if (!destination || !days || !budget || !plan) {
+    const {
+      data: memberships,
+      error:
+        membershipError,
+    } = await supabaseAdmin
+      .from(
+        "trip_members",
+      )
+      .select(
+        "trip_id",
+      )
+      .eq(
+        "user_id",
+        userId,
+      );
+
+    if (
+      membershipError
+    ) {
+
       return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
+        {
+          error:
+            membershipError.message,
+        },
+        { status: 500 },
       );
     }
 
-    // Single atomic operation — insert and get the new row back immediately
-    const { data, error } = await supabaseAdmin
+    const tripIds =
+      memberships?.map(
+        (
+          m,
+        ) => m.trip_id,
+      ) || [];
+
+    // NO TRIPS
+    if (
+      tripIds.length === 0
+    ) {
+
+      return NextResponse.json(
+        [],
+      );
+    }
+
+    // ====================================
+    // GET TRIPS
+    // ====================================
+
+    const {
+      data,
+      error,
+    } = await supabaseAdmin
+      .from("trips")
+      .select("*")
+      .in(
+        "id",
+        tripIds,
+      )
+      .order(
+        "created_at",
+        {
+          ascending: false,
+        },
+      );
+
+    if (error) {
+
+      console.error(
+        error,
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            error.message,
+        },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json(
+      data || [],
+    );
+
+  } catch (err: any) {
+
+    console.error(
+      err,
+    );
+
+    return NextResponse.json(
+      {
+        error:
+          err.message ||
+          "Server error",
+      },
+      { status: 500 },
+    );
+  }
+}
+
+// ====================================
+// CREATE TRIP
+// ====================================
+
+export async function POST(
+  req: Request,
+) {
+
+  try {
+
+    // ====================================
+    // AUTH
+    // ====================================
+
+    const { userId } =
+      await auth();
+
+    if (!userId) {
+
+      return NextResponse.json(
+        {
+          error:
+            "Unauthorized",
+        },
+        { status: 401 },
+      );
+    }
+
+    // ====================================
+    // BODY
+    // ====================================
+
+    const body =
+      await req.json();
+
+    const {
+      destination,
+      days,
+      budget,
+      plan,
+      user_name,
+    } = body;
+
+    // ====================================
+    // VALIDATION
+    // ====================================
+
+    if (
+      !destination ||
+      !days ||
+      !budget ||
+      !plan
+    ) {
+
+      return NextResponse.json(
+        {
+          error:
+            "Missing required fields",
+        },
+        { status: 400 },
+      );
+    }
+
+    // DAYS
+    if (
+      Number(days) <= 0
+    ) {
+
+      return NextResponse.json(
+        {
+          error:
+            "Invalid days",
+        },
+        { status: 400 },
+      );
+    }
+
+    // BUDGET
+    if (
+      Number(budget) <= 0
+    ) {
+
+      return NextResponse.json(
+        {
+          error:
+            "Invalid budget",
+        },
+        { status: 400 },
+      );
+    }
+
+    // ====================================
+    // GENERATE INVITE CODE
+    // ====================================
+
+    const inviteCode =
+      crypto.randomUUID();
+
+    // ====================================
+    // CREATE TRIP
+    // ====================================
+
+    const {
+      data: trip,
+      error: tripError,
+    } = await supabaseAdmin
       .from("trips")
       .insert({
-        user_id: userId,
-        destination,
-        days,
-        budget,
+        user_id:
+          userId,
+
+        destination:
+          String(
+            destination,
+          ).trim(),
+
+        days:
+          Number(days),
+
+        budget:
+          Number(budget),
+
         plan,
+
+        invite_code:
+          inviteCode,
       })
       .select()
       .single();
 
-    if (error || !data) {
+    if (
+      tripError ||
+      !trip
+    ) {
+
+      console.error(
+        tripError,
+      );
+
       return NextResponse.json(
-        { error: error?.message ?? "Failed to create trip" },
-        { status: 500 }
+        {
+          error:
+            tripError?.message ||
+            "Failed to create trip",
+        },
+        { status: 500 },
       );
     }
 
+    // ====================================
+    // AUTO ADD OWNER
+    // ====================================
+
+    const {
+      error:
+        memberError,
+    } =
+      await supabaseAdmin
+        .from(
+          "trip_members",
+        )
+        .insert({
+          trip_id:
+            trip.id,
+
+          user_id:
+            userId,
+
+          user_name:
+            user_name ||
+            "Trip Owner",
+
+          role:
+            "owner",
+        });
+
+    // ROLLBACK TRIP IF MEMBER FAILS
+    if (memberError) {
+
+      console.error(
+        memberError,
+      );
+
+      // DELETE CREATED TRIP
+      await supabaseAdmin
+        .from("trips")
+        .delete()
+        .eq(
+          "id",
+          trip.id,
+        );
+
+      return NextResponse.json(
+        {
+          error:
+            "Failed to initialize trip",
+        },
+        { status: 500 },
+      );
+    }
+
+    // ====================================
+    // SUCCESS
+    // ====================================
+
     return NextResponse.json({
-      message: "Trip created",
-      trip: data,
+      success: true,
+
+      message:
+        "Trip created successfully",
+
+      trip,
     });
 
   } catch (err: any) {
+
+    console.error(
+      err,
+    );
+
     return NextResponse.json(
-      { error: err.message || "Server error" },
-      { status: 500 }
+      {
+        error:
+          err.message ||
+          "Server error",
+      },
+      { status: 500 },
     );
   }
 }

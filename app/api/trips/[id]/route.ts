@@ -4,7 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export async function GET(
   req: Request,
-  context: { params: Promise<{ id: string }> } // ✅ FIX
+  context: { params: Promise<{ id: string }> }, // ✅ FIX
 ) {
   const { userId } = await auth();
 
@@ -20,14 +20,14 @@ export async function GET(
   }
 
   console.log("API ID:", id);
-  console.log("USER ID:", userId);
 
   const { data, error } = await supabaseAdmin
     .from("trips")
     .select("*")
     .eq("id", id);
-
-  console.log("DB RESULT:", data);
+  if (process.env.NODE_ENV === "development") {
+    console.error(error);
+  }
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

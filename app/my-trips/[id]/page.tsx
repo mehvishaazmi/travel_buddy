@@ -7,16 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Footer } from "@/components/Footer";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
 import { useUser } from "@clerk/nextjs";
 import { Loader2, Plus, Trash2, Users, Wallet, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
+
 
 type Expense = {
   id: string;

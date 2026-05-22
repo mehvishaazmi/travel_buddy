@@ -4,7 +4,10 @@ import { auth } from "@clerk/nextjs/server";
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
+// ====================================
 // VALID CATEGORIES
+// ====================================
+
 const VALID_CATEGORIES = [
   "Food",
   "Hotel",
@@ -57,13 +60,30 @@ export async function POST(
     } = body;
 
     // ====================================
+    // SANITIZE INPUTS
+    // ====================================
+
+    const safeTripId =
+      String(
+        trip_id || "",
+      ).trim();
+
+    const safeTitle =
+      String(
+        title || "",
+      ).trim();
+
+    const normalizedAmount =
+      Number(amount);
+
+    // ====================================
     // VALIDATION
     // ====================================
 
     if (
-      !trip_id ||
-      !title ||
-      !amount
+      !safeTripId ||
+      !safeTitle ||
+      !normalizedAmount
     ) {
 
       return NextResponse.json(
@@ -75,12 +95,11 @@ export async function POST(
       );
     }
 
-    const total =
-      Number(amount);
-
     if (
-      isNaN(total) ||
-      total <= 0
+      isNaN(
+        normalizedAmount,
+      ) ||
+      normalizedAmount <= 0
     ) {
 
       return NextResponse.json(
@@ -92,7 +111,28 @@ export async function POST(
       );
     }
 
+    // ====================================
+    // LIMIT PROTECTION
+    // ====================================
+
+    if (
+      normalizedAmount >
+      1000000
+    ) {
+
+      return NextResponse.json(
+        {
+          error:
+            "Amount exceeds limit",
+        },
+        { status: 400 },
+      );
+    }
+
+    // ====================================
     // CATEGORY VALIDATION
+    // ====================================
+
     const safeCategory =
       VALID_CATEGORIES.includes(
         category,
@@ -116,7 +156,7 @@ export async function POST(
         .select("*")
         .eq(
           "trip_id",
-          trip_id,
+          safeTripId,
         );
 
     if (
@@ -147,7 +187,7 @@ export async function POST(
     }
 
     // ====================================
-    // SECURITY CHECK
+    // VERIFY CURRENT MEMBER
     // ====================================
 
     const currentMember =
@@ -187,27 +227,19 @@ export async function POST(
         )
         .insert({
           trip_id:
-            String(
-              trip_id,
-            ),
+            safeTripId,
 
           user_id:
-            String(
-              userId,
-            ),
+            userId,
 
           title:
-            String(
-              title,
-            ).trim(),
+            safeTitle,
 
           amount:
-            total,
+            normalizedAmount,
 
           paid_by:
-            String(
-              userId,
-            ),
+            userId,
 
           paid_by_name:
             currentMember.user_name,
@@ -244,16 +276,19 @@ export async function POST(
     const memberCount =
       members.length;
 
-    // AVOID FLOATING LOSS
-    const baseSplit =
+    // PREVENT FLOATING POINT ISSUES
+    const splitInPaise =
       Math.floor(
-        (total /
-          memberCount) *
-          100,
-      ) / 100;
+        (normalizedAmount *
+          100) /
+          memberCount,
+      );
 
-    let remaining =
-      total;
+    let remainingPaise =
+      Math.round(
+        normalizedAmount *
+          100,
+      );
 
     const splitRows =
       members.map(
@@ -262,8 +297,8 @@ export async function POST(
           index,
         ) => {
 
-          let splitAmount =
-            baseSplit;
+          let splitAmountPaise =
+            splitInPaise;
 
           // LAST MEMBER GETS REMAINDER
           if (
@@ -272,28 +307,23 @@ export async function POST(
               1
           ) {
 
-            splitAmount =
-              Number(
-                remaining.toFixed(
-                  2,
-                ),
-              );
+            splitAmountPaise =
+              remainingPaise;
           }
 
-          remaining -=
-            splitAmount;
+          remainingPaise -=
+            splitAmountPaise;
 
           return {
             expense_id:
               expense.id,
 
             user_id:
-              String(
-                member.user_id,
-              ),
+              member.user_id,
 
             amount:
-              splitAmount,
+              splitAmountPaise /
+              100,
           };
         },
       );
@@ -314,7 +344,10 @@ export async function POST(
           splitRows,
         );
 
-    // ROLLBACK EXPENSE
+    // ====================================
+    // ROLLBACK
+    // ====================================
+
     if (splitError) {
 
       console.error(

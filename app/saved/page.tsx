@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 
 import { useUser } from "@clerk/nextjs";
 
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
 
 import Navbar from "@/components/Navbar";
 
@@ -16,10 +16,6 @@ import { Button } from "@/components/ui/button";
 
 import { Loader2, Heart } from "lucide-react";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
 
 type Buddy = {
   id: string;

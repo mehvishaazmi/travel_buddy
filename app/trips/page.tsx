@@ -5,6 +5,8 @@ import {
   useState,
 } from "react";
 
+import Image from "next/image";
+
 import {
   useRouter,
 } from "next/navigation";
@@ -13,10 +15,15 @@ import {
   useUser,
 } from "@clerk/nextjs";
 
-import {
-  createClient,
+import type {
   RealtimeChannel,
 } from "@supabase/supabase-js";
+
+import { supabase } from "@/lib/supabase";
+
+import type {
+  TripWithMembers,
+} from "@/types";
 
 import Navbar from "@/components/Navbar";
 
@@ -34,34 +41,6 @@ import {
   Receipt,
   ArrowRight,
 } from "lucide-react";
-
-const supabase =
-  createClient(
-    process.env
-      .NEXT_PUBLIC_SUPABASE_URL!,
-
-    process.env
-      .NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
-
-type Trip = {
-  id: string;
-
-  destination: string;
-
-  days: string;
-
-  budget: string;
-
-  created_at: string;
-
-  plan?: any;
-};
-
-type TripWithMembers =
-  Trip & {
-    membersCount: number;
-  };
 
 const getImage = (
   destination: string,
@@ -99,9 +78,13 @@ export default function TripsPage() {
   useEffect(() => {
 
     let channel:
-      RealtimeChannel;
+      RealtimeChannel | null =
+        null;
 
-    if (user?.id) {
+    if (
+      user?.id &&
+      isLoaded
+    ) {
 
       channel =
         supabase
@@ -140,10 +123,13 @@ export default function TripsPage() {
       }
     };
 
-  }, [user?.id]);
+  }, [
+    user?.id,
+    isLoaded,
+  ]);
 
   // ====================================
-  // FETCH
+  // INITIAL FETCH
   // ====================================
 
   useEffect(() => {
@@ -222,7 +208,10 @@ export default function TripsPage() {
           ) => m.trip_id,
         ) || [];
 
-      // NO TRIPS
+      // ====================================
+      // EMPTY STATE
+      // ====================================
+
       if (
         tripIds.length === 0
       ) {
@@ -233,7 +222,7 @@ export default function TripsPage() {
       }
 
       // ====================================
-      // GET TRIPS
+      // FETCH TRIPS
       // ====================================
 
       const {
@@ -270,11 +259,13 @@ export default function TripsPage() {
         return;
       }
 
-      const safeTrips =
-        tripsData || [];
+      const safeTrips:
+        TripWithMembers[] =
+        (tripsData as TripWithMembers[]) ||
+        [];
 
       // ====================================
-      // GET ALL MEMBER COUNTS
+      // FETCH MEMBER COUNTS
       // ====================================
 
       const {
@@ -292,7 +283,6 @@ export default function TripsPage() {
           tripIds,
         );
 
-      // COUNT MAP
       const countMap:
         Record<
           string,
@@ -317,8 +307,12 @@ export default function TripsPage() {
         },
       );
 
-      // ENRICH
-      const enrichedTrips =
+      // ====================================
+      // ENRICH DATA
+      // ====================================
+
+      const enrichedTrips:
+        TripWithMembers[] =
         safeTrips.map(
           (
             trip,
@@ -363,9 +357,7 @@ export default function TripsPage() {
         trip,
       ) =>
         sum +
-        Number(
-          trip.budget,
-        ),
+        trip.budget,
 
       0,
     );
@@ -633,16 +625,21 @@ export default function TripsPage() {
                     {/* IMAGE */}
                     <div className="relative h-56 overflow-hidden">
 
-                      <img
+                      <Image
                         src={getImage(
                           trip.destination,
                         )}
                         alt={
                           trip.destination
                         }
+                        fill
+                        priority={false}
+                        sizes="
+                          (max-width: 768px) 100vw,
+                          (max-width: 1200px) 50vw,
+                          33vw
+                        "
                         className="
-                          h-full
-                          w-full
                           object-cover
                           transition-transform
                           duration-700
@@ -699,9 +696,7 @@ export default function TripsPage() {
                           <Wallet className="h-4 w-4" />
 
                           ₹
-                          {Number(
-                            trip.budget,
-                          ).toLocaleString()}
+                          {trip.budget.toLocaleString()}
                         </span>
 
                         <span className="flex items-center gap-1">

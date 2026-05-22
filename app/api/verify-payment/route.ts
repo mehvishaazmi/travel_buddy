@@ -47,7 +47,10 @@ export async function POST(
       razorpay_signature,
 
       trip_id,
+
+      receiver_user_id,
       receiver_name,
+
       amount,
     } = body;
 
@@ -60,7 +63,7 @@ export async function POST(
       !razorpay_payment_id ||
       !razorpay_signature ||
       !trip_id ||
-      !receiver_name ||
+      !receiver_user_id ||
       !amount
     ) {
 
@@ -98,6 +101,7 @@ export async function POST(
 
     const {
       data: currentMember,
+      error: memberError,
     } =
       await supabaseAdmin
         .from(
@@ -114,7 +118,10 @@ export async function POST(
         )
         .single();
 
-    if (!currentMember) {
+    if (
+      memberError ||
+      !currentMember
+    ) {
 
       return NextResponse.json(
         {
@@ -122,6 +129,43 @@ export async function POST(
             "You are not a member of this trip",
         },
         { status: 403 },
+      );
+    }
+
+    // ====================================
+    // VERIFY RECEIVER EXISTS
+    // ====================================
+
+    const {
+      data: receiverMember,
+      error: receiverError,
+    } =
+      await supabaseAdmin
+        .from(
+          "trip_members",
+        )
+        .select("*")
+        .eq(
+          "trip_id",
+          trip_id,
+        )
+        .eq(
+          "user_id",
+          receiver_user_id,
+        )
+        .single();
+
+    if (
+      receiverError ||
+      !receiverMember
+    ) {
+
+      return NextResponse.json(
+        {
+          error:
+            "Receiver not found in this trip",
+        },
+        { status: 404 },
       );
     }
 
@@ -205,10 +249,17 @@ export async function POST(
         .insert({
           trip_id,
 
+          payer_user_id:
+            currentMember.user_id,
+
+          receiver_user_id,
+
           payer_name:
             currentMember.user_name,
 
-          receiver_name,
+          receiver_name:
+            receiver_name ||
+            receiverMember.user_name,
 
           amount:
             normalizedAmount,
@@ -219,7 +270,10 @@ export async function POST(
             "completed",
         });
 
-    // HANDLE RACE CONDITION
+    // ====================================
+    // HANDLE DUPLICATES
+    // ====================================
+
     if (
       settlementError?.code ===
       "23505"

@@ -61,6 +61,7 @@ export async function POST(
     const {
       amount,
       trip_id,
+      receiver_user_id,
     } = body;
 
     const normalizedAmount =
@@ -86,7 +87,10 @@ export async function POST(
       );
     }
 
+    // ====================================
     // MAX LIMIT
+    // ====================================
+
     if (
       normalizedAmount >
       100000
@@ -102,28 +106,36 @@ export async function POST(
     }
 
     // ====================================
-    // VERIFY TRIP MEMBERSHIP
+    // REQUIRED FIELDS
     // ====================================
 
-    if (!trip_id) {
+    if (
+      !trip_id ||
+      !receiver_user_id
+    ) {
 
       return NextResponse.json(
         {
           error:
-            "Trip ID required",
+            "Missing required fields",
         },
         { status: 400 },
       );
     }
 
+    // ====================================
+    // VERIFY PAYER MEMBERSHIP
+    // ====================================
+
     const {
-      data: member,
+      data: payerMember,
+      error: payerError,
     } =
       await supabaseAdmin
         .from(
           "trip_members",
         )
-        .select("id")
+        .select("*")
         .eq(
           "trip_id",
           trip_id,
@@ -134,7 +146,10 @@ export async function POST(
         )
         .single();
 
-    if (!member) {
+    if (
+      payerError ||
+      !payerMember
+    ) {
 
       return NextResponse.json(
         {
@@ -142,6 +157,61 @@ export async function POST(
             "Access denied",
         },
         { status: 403 },
+      );
+    }
+
+    // ====================================
+    // VERIFY RECEIVER MEMBERSHIP
+    // ====================================
+
+    const {
+      data: receiverMember,
+      error: receiverError,
+    } =
+      await supabaseAdmin
+        .from(
+          "trip_members",
+        )
+        .select("*")
+        .eq(
+          "trip_id",
+          trip_id,
+        )
+        .eq(
+          "user_id",
+          receiver_user_id,
+        )
+        .single();
+
+    if (
+      receiverError ||
+      !receiverMember
+    ) {
+
+      return NextResponse.json(
+        {
+          error:
+            "Receiver not found",
+        },
+        { status: 404 },
+      );
+    }
+
+    // ====================================
+    // PREVENT SELF PAYMENT
+    // ====================================
+
+    if (
+      userId ===
+      receiver_user_id
+    ) {
+
+      return NextResponse.json(
+        {
+          error:
+            "Cannot pay yourself",
+        },
+        { status: 400 },
       );
     }
 
@@ -166,8 +236,11 @@ export async function POST(
 
           notes: {
             trip_id,
-            user_id:
+
+            payer_user_id:
               userId,
+
+            receiver_user_id,
           },
         },
       );
@@ -183,6 +256,7 @@ export async function POST(
   } catch (error) {
 
     console.error(
+      "CREATE ORDER ERROR:",
       error,
     );
 

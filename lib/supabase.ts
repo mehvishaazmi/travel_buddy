@@ -1,25 +1,21 @@
 // lib/supabase.ts
 
-import {
-  createClient,
-} from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 
-// ====================================
-// CLIENT-SIDE SUPABASE INSTANCE
-// ====================================
-// SAFE FOR:
-// - browser/client components
-// - realtime subscriptions
-// - public anon access
-//
-// NEVER use service role key here.
-// ====================================
+const supabaseUrl =
+  process.env.NEXT_PUBLIC_SUPABASE_URL!;
 
-export const supabase =
-  createClient(
-    process.env
-      .NEXT_PUBLIC_SUPABASE_URL!,
+const supabaseAnonKey =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-    process.env
-      .NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
+export const supabase = createClient(
+  supabaseUrl,
+  supabaseAnonKey,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  }
+);

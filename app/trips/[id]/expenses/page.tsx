@@ -1,6 +1,8 @@
 "use client";
 
-import { RealtimeChannel } from "@supabase/supabase-js";
+import type {
+  RealtimeChannel,
+} from "@supabase/supabase-js";
 
 import {
   useEffect,
@@ -8,11 +10,21 @@ import {
   useState,
 } from "react";
 
-import { useParams } from "next/navigation";
+import {
+  useParams,
+} from "next/navigation";
 
-import { useUser } from "@clerk/nextjs";
+import {
+  useUser,
+} from "@clerk/nextjs";
 
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
+
+import type {
+  Member,
+  Expense,
+  Settlement,
+} from "@/types";
 
 import Navbar from "@/components/Navbar";
 
@@ -41,45 +53,37 @@ import {
 import { toast } from "sonner";
 
 declare global {
+
   interface Window {
+
     Razorpay: any;
   }
 }
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
+// ====================================
+// LOCAL TYPES
+// ====================================
 
-type Member = {
-  id: string;
-  user_id: string;
-  user_name: string;
-};
+type SettlementSuggestion = {
+  payer_user_id: string;
+  payer_name: string;
 
-type Expense = {
-  id: string;
-  title: string;
-  amount: number;
-  category?: string;
-  paid_by: string;
-  paid_by_name: string;
-  created_at: string;
-};
+  receiver_user_id: string;
+  receiver_name: string;
 
-type Settlement = {
-  from: string;
-  to: string;
   amount: number;
 };
 
 export default function TripExpensesPage() {
 
-  const params = useParams();
+  const params =
+    useParams();
 
-  const { user } = useUser();
+  const { user } =
+    useUser();
 
-  const tripId = params.id as string;
+  const tripId =
+    params.id as string;
 
   const [members, setMembers] =
     useState<Member[]>([]);
@@ -87,9 +91,12 @@ export default function TripExpensesPage() {
   const [expenses, setExpenses] =
     useState<Expense[]>([]);
 
-  const [completedSettlements,
-    setCompletedSettlements] =
-      useState<any[]>([]);
+  const [
+    completedSettlements,
+    setCompletedSettlements,
+  ] = useState<
+    Settlement[]
+  >([]);
 
   const [loading, setLoading] =
     useState(true);
@@ -112,56 +119,73 @@ export default function TripExpensesPage() {
 
   useEffect(() => {
 
-    let channel: RealtimeChannel;
+    let channel:
+      RealtimeChannel | null =
+        null;
 
     if (tripId) {
 
-      channel = supabase
-        .channel(`trip-${tripId}`)
+      channel =
+        supabase
+          .channel(
+            `trip-${tripId}`,
+          )
 
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "expenses",
-            filter: `trip_id=eq.${tripId}`,
-          },
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema:
+                "public",
+              table:
+                "expenses",
+              filter:
+                `trip_id=eq.${tripId}`,
+            },
 
-          async () => {
-            await fetchAll();
-          },
-        )
+            async () => {
 
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "trip_members",
-            filter: `trip_id=eq.${tripId}`,
-          },
+              await fetchAll();
+            },
+          )
 
-          async () => {
-            await fetchAll();
-          },
-        )
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema:
+                "public",
+              table:
+                "trip_members",
+              filter:
+                `trip_id=eq.${tripId}`,
+            },
 
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "settlements",
-            filter: `trip_id=eq.${tripId}`,
-          },
+            async () => {
 
-          async () => {
-            await fetchAll();
-          },
-        )
+              await fetchAll();
+            },
+          )
 
-        .subscribe();
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema:
+                "public",
+              table:
+                "settlements",
+              filter:
+                `trip_id=eq.${tripId}`,
+            },
+
+            async () => {
+
+              await fetchAll();
+            },
+          )
+
+          .subscribe();
     }
 
     return () => {
@@ -201,9 +225,12 @@ export default function TripExpensesPage() {
 
       // MEMBERS
       const {
-        data: membersData,
+        data:
+          membersData,
       } = await supabase
-        .from("trip_members")
+        .from(
+          "trip_members",
+        )
         .select("*")
         .eq(
           "trip_id",
@@ -211,14 +238,18 @@ export default function TripExpensesPage() {
         );
 
       setMembers(
-        membersData || [],
+        (membersData ||
+          []) as Member[],
       );
 
       // EXPENSES
       const {
-        data: expensesData,
+        data:
+          expensesData,
       } = await supabase
-        .from("expenses")
+        .from(
+          "expenses",
+        )
         .select("*")
         .eq(
           "trip_id",
@@ -227,19 +258,24 @@ export default function TripExpensesPage() {
         .order(
           "created_at",
           {
-            ascending: false,
+            ascending:
+              false,
           },
         );
 
       setExpenses(
-        expensesData || [],
+        (expensesData ||
+          []) as Expense[],
       );
 
       // SETTLEMENTS
       const {
-        data: settlementsData,
+        data:
+          settlementsData,
       } = await supabase
-        .from("settlements")
+        .from(
+          "settlements",
+        )
         .select("*")
         .eq(
           "trip_id",
@@ -247,7 +283,8 @@ export default function TripExpensesPage() {
         );
 
       setCompletedSettlements(
-        settlementsData || [],
+        (settlementsData ||
+          []) as Settlement[],
       );
 
     } catch (error) {
@@ -275,7 +312,7 @@ export default function TripExpensesPage() {
     try {
 
       if (
-        !title ||
+        !title.trim() ||
         !amount
       ) {
 
@@ -306,17 +343,15 @@ export default function TripExpensesPage() {
                 trip_id:
                   tripId,
 
-                title,
+                title:
+                  title.trim(),
 
                 amount:
-                  Number(amount),
+                  Number(
+                    amount,
+                  ),
 
                 category,
-
-                paid_by_name:
-                  user?.fullName ||
-                  user?.firstName ||
-                  "Traveler",
               }),
           },
         );
@@ -324,7 +359,9 @@ export default function TripExpensesPage() {
       const data =
         await response.json();
 
-      if (!response.ok) {
+      if (
+        !response.ok
+      ) {
 
         toast.error(
           data.error ||
@@ -369,10 +406,15 @@ export default function TripExpensesPage() {
   // ====================================
 
   async function handleSettlementPayment(
-    settlement: Settlement,
+    settlement:
+      SettlementSuggestion,
   ) {
 
     try {
+
+      // ====================================
+      // CREATE ORDER
+      // ====================================
 
       const orderRes =
         await fetch(
@@ -391,6 +433,12 @@ export default function TripExpensesPage() {
               JSON.stringify({
                 amount:
                   settlement.amount,
+
+                trip_id:
+                  tripId,
+
+                receiver_user_id:
+                  settlement.receiver_user_id,
               }),
           },
         );
@@ -407,98 +455,106 @@ export default function TripExpensesPage() {
         return;
       }
 
+      // ====================================
+      // OPEN RAZORPAY
+      // ====================================
+
       const razorpay =
-        new window.Razorpay({
-          key:
-            process.env
-              .NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        new window.Razorpay(
+          {
+            key:
+              process.env
+                .NEXT_PUBLIC_RAZORPAY_KEY_ID,
 
-          amount:
-            order.amount,
+            amount:
+              order.amount,
 
-          currency:
-            order.currency,
+            currency:
+              order.currency,
 
-          name:
-            "TravelBuddy",
+            name:
+              "TravelBuddy",
 
-          description:
-            "Trip Settlement",
+            description:
+              "Trip Settlement",
 
-          order_id:
-            order.id,
+            order_id:
+              order.id,
 
-          theme: {
-            color:
-              "#06b6d4",
-          },
-
-          handler:
-            async (
-              response: any,
-            ) => {
-
-              const verifyRes =
-                await fetch(
-                  "/api/verify-payment",
-                  {
-                    method:
-                      "POST",
-
-                    headers:
-                      {
-                        "Content-Type":
-                          "application/json",
-                      },
-
-                    body:
-                      JSON.stringify({
-                        razorpay_order_id:
-                          response.razorpay_order_id,
-
-                        razorpay_payment_id:
-                          response.razorpay_payment_id,
-
-                        razorpay_signature:
-                          response.razorpay_signature,
-
-                        trip_id:
-                          tripId,
-
-                        payer_name:
-                          settlement.from,
-
-                        receiver_name:
-                          settlement.to,
-
-                        amount:
-                          settlement.amount,
-                      }),
-                  },
-                );
-
-              const verifyData =
-                await verifyRes.json();
-
-              if (
-                !verifyRes.ok
-              ) {
-
-                toast.error(
-                  verifyData.error ||
-                    "Payment verification failed",
-                );
-
-                return;
-              }
-
-              toast.success(
-                "Settlement completed!",
-              );
-
-              await fetchAll();
+            theme: {
+              color:
+                "#06b6d4",
             },
-        });
+
+            handler:
+              async (
+                response: any,
+              ) => {
+
+                const verifyRes =
+                  await fetch(
+                    "/api/verify-payment",
+                    {
+                      method:
+                        "POST",
+
+                      headers:
+                        {
+                          "Content-Type":
+                            "application/json",
+                        },
+
+                      body:
+                        JSON.stringify(
+                          {
+                            razorpay_order_id:
+                              response.razorpay_order_id,
+
+                            razorpay_payment_id:
+                              response.razorpay_payment_id,
+
+                            razorpay_signature:
+                              response.razorpay_signature,
+
+                            trip_id:
+                              tripId,
+
+                            receiver_user_id:
+                              settlement.receiver_user_id,
+
+                            receiver_name:
+                              settlement.receiver_name,
+
+                            amount:
+                              settlement.amount,
+                          },
+                        ),
+                    },
+                  );
+
+                const verifyData =
+                  await verifyRes.json();
+
+                if (
+                  !verifyRes.ok
+                ) {
+
+                  toast.error(
+                    verifyData.error ||
+                      "Payment verification failed",
+                  );
+
+                  return;
+                }
+
+                toast.success(
+                  "Settlement completed!",
+                );
+
+                await fetchAll();
+              },
+          },
+        );
 
       razorpay.open();
 
@@ -525,9 +581,7 @@ export default function TripExpensesPage() {
         expense,
       ) =>
         sum +
-        Number(
-          expense.amount,
-        ),
+        expense.amount,
 
       0,
     );
@@ -539,50 +593,66 @@ export default function TripExpensesPage() {
   const balances =
     useMemo(() => {
 
-      const map: Record<
-        string,
-        number
-      > = {};
+      const map:
+        Record<
+          string,
+          {
+            user_id: string;
+            name: string;
+            balance: number;
+          }
+        > = {};
 
       members.forEach(
-        (member) => {
+        (
+          member,
+        ) => {
 
           map[
-            member.user_name
-          ] = 0;
+            member.user_id
+          ] = {
+            user_id:
+              member.user_id,
+
+            name:
+              member.user_name,
+
+            balance: 0,
+          };
         },
       );
 
       expenses.forEach(
-        (expense) => {
+        (
+          expense,
+        ) => {
 
           const split =
-            Number(
-              expense.amount,
-            ) /
+            expense.amount /
             members.length;
 
           members.forEach(
-            (member) => {
+            (
+              member,
+            ) => {
 
               if (
-                member.user_name ===
-                expense.paid_by_name
+                member.user_id ===
+                expense.paid_by
               ) {
 
                 map[
-                  member.user_name
-                ] +=
-                  Number(
-                    expense.amount,
-                  ) -
+                  member.user_id
+                ].balance +=
+                  expense.amount -
                   split;
 
               } else {
 
                 map[
-                  member.user_name
-                ] -= split;
+                  member.user_id
+                ].balance -=
+                  split;
               }
             },
           );
@@ -603,43 +673,64 @@ export default function TripExpensesPage() {
   const settlements =
     useMemo(() => {
 
-      const creditors: {
-        name: string;
-        amount: number;
-      }[] = [];
+      const creditors:
+        SettlementSuggestion[] =
+          [];
 
-      const debtors: {
-        name: string;
-        amount: number;
-      }[] = [];
+      const debtors:
+        SettlementSuggestion[] =
+          [];
 
-      Object.entries(
+      Object.values(
         balances,
       ).forEach(
-        ([
-          name,
-          amount,
-        ]) => {
+        (
+          userBalance,
+        ) => {
 
           if (
-            amount > 0
+            userBalance.balance >
+            0
           ) {
 
             creditors.push({
-              name,
-              amount,
+              payer_user_id:
+                "",
+
+              payer_name:
+                "",
+
+              receiver_user_id:
+                userBalance.user_id,
+
+              receiver_name:
+                userBalance.name,
+
+              amount:
+                userBalance.balance,
             });
 
           } else if (
-            amount < 0
+            userBalance.balance <
+            0
           ) {
 
             debtors.push({
-              name,
+              payer_user_id:
+                userBalance.user_id,
+
+              payer_name:
+                userBalance.name,
+
+              receiver_user_id:
+                "",
+
+              receiver_name:
+                "",
 
               amount:
                 Math.abs(
-                  amount,
+                  userBalance.balance,
                 ),
             });
           }
@@ -647,7 +738,8 @@ export default function TripExpensesPage() {
       );
 
       const result:
-        Settlement[] = [];
+        SettlementSuggestion[] =
+          [];
 
       let i = 0;
 
@@ -672,19 +764,24 @@ export default function TripExpensesPage() {
             creditor.amount,
           );
 
-        // ALREADY PAID?
+        // ====================================
+        // ALREADY PAID
+        // ====================================
+
         const alreadyPaid =
           completedSettlements.some(
             (
               settlementRecord,
             ) =>
-              settlementRecord.payer_name ===
-                debtor.name &&
-              settlementRecord.receiver_name ===
-                creditor.name,
+              settlementRecord.payer_user_id ===
+                debtor.payer_user_id &&
+              settlementRecord.receiver_user_id ===
+                creditor.receiver_user_id,
           );
 
-        if (alreadyPaid) {
+        if (
+          alreadyPaid
+        ) {
 
           debtor.amount -=
             payAmount;
@@ -693,12 +790,14 @@ export default function TripExpensesPage() {
             payAmount;
 
           if (
-            debtor.amount <= 0
+            debtor.amount <=
+            0
           )
             i++;
 
           if (
-            creditor.amount <= 0
+            creditor.amount <=
+            0
           )
             j++;
 
@@ -706,11 +805,17 @@ export default function TripExpensesPage() {
         }
 
         result.push({
-          from:
-            debtor.name,
+          payer_user_id:
+            debtor.payer_user_id,
 
-          to:
-            creditor.name,
+          payer_name:
+            debtor.payer_name,
+
+          receiver_user_id:
+            creditor.receiver_user_id,
+
+          receiver_name:
+            creditor.receiver_name,
 
           amount:
             payAmount,
@@ -723,12 +828,14 @@ export default function TripExpensesPage() {
           payAmount;
 
         if (
-          debtor.amount <= 0
+          debtor.amount <=
+          0
         )
           i++;
 
         if (
-          creditor.amount <= 0
+          creditor.amount <=
+          0
         )
           j++;
       }
@@ -921,7 +1028,8 @@ export default function TripExpensesPage() {
 
             <h2 className="mt-3 text-4xl font-bold">
 
-              ₹{totalExpenses.toLocaleString()}
+              ₹
+              {totalExpenses.toLocaleString()}
             </h2>
           </div>
 
@@ -966,16 +1074,17 @@ export default function TripExpensesPage() {
 
           <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
 
-            {Object.entries(
+            {Object.values(
               balances,
             ).map(
-              ([
-                name,
-                balance,
-              ]) => (
+              (
+                userBalance,
+              ) => (
 
                 <div
-                  key={name}
+                  key={
+                    userBalance.user_id
+                  }
                   className="
                     rounded-2xl
                     border
@@ -986,23 +1095,29 @@ export default function TripExpensesPage() {
 
                   <h3 className="text-lg font-semibold text-slate-900">
 
-                    {name}
+                    {
+                      userBalance.name
+                    }
                   </h3>
 
                   <p
                     className={`mt-2 text-xl font-bold ${
-                      balance >= 0
+                      userBalance.balance >=
+                      0
                         ? "text-green-600"
                         : "text-red-600"
                     }`}
                   >
 
-                    {balance >= 0
+                    {userBalance.balance >=
+                    0
                       ? "+"
                       : "-"}
+
                     ₹
+
                     {Math.abs(
-                      balance,
+                      userBalance.balance,
                     ).toFixed(
                       0,
                     )}
@@ -1062,15 +1177,16 @@ export default function TripExpensesPage() {
                       <p className="text-lg font-semibold text-slate-900">
 
                         {
-                          settlement.from
+                          settlement.payer_name
                         }
                       </p>
 
                       <p className="text-sm text-slate-500">
 
                         owes{" "}
+
                         {
-                          settlement.to
+                          settlement.receiver_name
                         }
                       </p>
                     </div>
@@ -1080,6 +1196,7 @@ export default function TripExpensesPage() {
                       <p className="text-2xl font-bold text-cyan-600">
 
                         ₹
+
                         {settlement.amount.toFixed(
                           0,
                         )}
@@ -1159,6 +1276,7 @@ export default function TripExpensesPage() {
                       <p className="mt-1 text-sm text-slate-500">
 
                         Paid by{" "}
+
                         {
                           expense.paid_by_name
                         }
@@ -1188,15 +1306,15 @@ export default function TripExpensesPage() {
                       <p className="text-2xl font-bold text-slate-900">
 
                         ₹
-                        {Number(
-                          expense.amount,
-                        ).toLocaleString()}
+
+                        {expense.amount.toLocaleString()}
                       </p>
 
                       <p className="mt-1 text-xs text-slate-400">
 
                         {new Date(
-                          expense.created_at,
+                          expense.created_at ||
+                            "",
                         ).toLocaleDateString()}
                       </p>
                     </div>

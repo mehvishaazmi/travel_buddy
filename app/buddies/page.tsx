@@ -4,17 +4,14 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
 import type { DateRange } from "react-day-picker";
 
 import Navbar from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
+
 
 type BuddyProfile = {
   id: string;

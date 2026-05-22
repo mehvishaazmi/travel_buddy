@@ -298,71 +298,30 @@ export default function Dashboard() {
   // FETCH TRIPS
   // ====================================
 
-  async function fetchTrips() {
+ async function fetchTrips() {
+  try {
 
-    try {
+    const response = await fetch("/api/trips");
 
-      // GET MEMBERSHIPS
-      const {
-        data:
-          memberships,
-      } = await supabase
-        .from(
-          "trip_members",
-        )
-        .select(
-          "trip_id",
-        )
-        .eq(
-          "user_id",
-          userId,
-        );
+    const data = await response.json();
 
-      const tripIds =
-        memberships?.map(
-          (
-            m,
-          ) => m.trip_id,
-        ) || [];
+    if (!response.ok) {
+      console.error(data);
 
-      if (
-        tripIds.length === 0
-      ) {
+      setTrips([]);
 
-        setTrips([]);
-
-        return;
-      }
-
-      // GET TRIPS
-      const {
-        data,
-      } = await supabase
-        .from("trips")
-        .select("*")
-        .in(
-          "id",
-          tripIds,
-        )
-        .order(
-          "created_at",
-          {
-            ascending: false,
-          },
-        )
-        .limit(6);
-
-      setTrips(
-        data || [],
-      );
-
-    } catch (error) {
-
-      console.error(
-        error,
-      );
+      return;
     }
+
+    setTrips(data || []);
+
+  } catch (error) {
+
+    console.error(error);
+
+    setTrips([]);
   }
+}
 
   // ====================================
   // FETCH BUDDIES

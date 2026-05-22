@@ -1,6 +1,9 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
+
 import { redirect } from "next/navigation";
+
 import { ReactNode } from "react";
+
 import { AdminSidebar } from "./AdminSidebar";
 
 export const metadata = {
@@ -13,7 +16,8 @@ export default async function AdminLayout({
 }: {
   children: ReactNode;
 }) {
-  // Get current user
+
+  // Current user
   const { userId } = await auth();
 
   // Not signed in
@@ -25,10 +29,12 @@ export default async function AdminLayout({
   const client = await clerkClient();
 
   // Fetch user
-  const user = await client.users.getUser(userId);
+  const user =
+    await client.users.getUser(userId);
 
-  // Check admin role
-  const isAdmin = user.publicMetadata?.role === "admin";
+  // Admin check
+  const isAdmin =
+    user.publicMetadata?.role === "admin";
 
   // Not admin
   if (!isAdmin) {
@@ -36,12 +42,16 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-[#0a0a0f]">
+    <div
+      id="admin-layout"
+      className="flex min-h-screen bg-[#0a0a0f] text-white transition-colors duration-300"
+    >
+
       {/* Sidebar */}
       <AdminSidebar />
 
       {/* Main content */}
-      <main className="flex-1 ml-64 p-8 overflow-y-auto">
+      <main className="ml-64 flex-1 overflow-y-auto p-8">
         {children}
       </main>
     </div>

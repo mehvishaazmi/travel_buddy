@@ -157,96 +157,142 @@ export default function Buddies() {
   // =========================================
 
   async function fetchBuddies(
-    profile: BuddyProfile | null,
-  ) {
-    try {
-      const {
-        data: profiles,
-        error: profilesError,
-      } = await supabase
-        .from("buddy_profiles")
-        .select("*")
-        .neq("user_id", currentUserId);
+  profile: BuddyProfile | null,
+) {
+  try {
+    if (!user?.id) {
+      setBuddies([]);
+      return;
+    }
 
-      if (profilesError) {
-        console.error(
-          "Failed to fetch profiles:",
-          profilesError,
-        );
+    // =========================================
+    // FETCH PROFILES
+    // =========================================
 
-        return;
-      }
+    const {
+      data: profiles,
+      error: profilesError,
+    } = await supabase
+      .from("buddy_profiles")
+      .select("*");
 
-      const safeProfiles = profiles || [];
-
-      if (safeProfiles.length === 0) {
-        setBuddies([]);
-        return;
-      }
-
-      const buddyIds = safeProfiles.map(
-        (p: BuddyProfile) => p.user_id,
-      );
-
-      const {
-        data: trips,
-        error: tripsError,
-      } = await supabase
-        .from("trips")
-        .select(
-          "id, user_id, destination, days, budget",
-        )
-        .in("user_id", buddyIds);
-
-      if (tripsError) {
-        console.error(
-          "Failed to fetch trips:",
-          tripsError,
-        );
-
-        return;
-      }
-
-      const tripsByUser: Record<
-        string,
-        Trip
-      > = {};
-
-      (trips || []).forEach((trip: Trip) => {
-        tripsByUser[trip.user_id] = trip;
-      });
-
-      const myInterests =
-        profile?.interests || [];
-
-      const merged: BuddyWithTrip[] =
-        safeProfiles.map(
-          (buddy: BuddyProfile) => ({
-            ...buddy,
-
-            trip:
-              tripsByUser[buddy.user_id],
-
-            match: calcMatch(
-              myInterests,
-              buddy.interests || [],
-            ),
-          }),
-        );
-
-      merged.sort(
-        (a, b) => b.match - a.match,
-      );
-
-      setBuddies(merged);
-
-    } catch (error) {
+    if (profilesError) {
       console.error(
-        "Unexpected fetchBuddies error:",
-        error,
+        "Failed to fetch profiles:",
+        profilesError,
+      );
+
+      setBuddies([]);
+      return;
+    }
+
+    // =========================================
+    // REMOVE CURRENT USER
+    // =========================================
+
+    const safeProfiles =
+      (profiles || []).filter(
+        (profile: BuddyProfile) =>
+          profile.user_id !== user.id,
+      );
+
+    if (safeProfiles.length === 0) {
+      setBuddies([]);
+      return;
+    }
+
+    // =========================================
+    // GET USER IDS
+    // =========================================
+
+    const buddyIds = safeProfiles.map(
+      (profile: BuddyProfile) =>
+        profile.user_id,
+    );
+
+    // =========================================
+    // FETCH TRIPS
+    // =========================================
+
+    const {
+      data: trips,
+      error: tripsError,
+    } = await supabase
+      .from("trips")
+      .select(
+        `
+          id,
+          user_id,
+          destination,
+          days,
+          budget
+        `,
+      )
+      .in("user_id", buddyIds);
+
+    if (tripsError) {
+      console.error(
+        "Failed to fetch trips:",
+        tripsError,
       );
     }
+
+    // =========================================
+    // CREATE MAP
+    // =========================================
+
+    const tripsByUser: Record<
+      string,
+      Trip
+    > = {};
+
+    (trips || []).forEach(
+      (trip: Trip) => {
+        tripsByUser[trip.user_id] = trip;
+      },
+    );
+
+    // =========================================
+    // MATCHING
+    // =========================================
+
+    const myInterests =
+      profile?.interests || [];
+
+    const merged: BuddyWithTrip[] =
+      safeProfiles.map(
+        (buddy: BuddyProfile) => ({
+          ...buddy,
+
+          trip:
+            tripsByUser[buddy.user_id],
+
+          match: calcMatch(
+            myInterests,
+            buddy.interests || [],
+          ),
+        }),
+      );
+
+    // =========================================
+    // SORT
+    // =========================================
+
+    merged.sort(
+      (a, b) => b.match - a.match,
+    );
+
+    setBuddies(merged);
+
+  } catch (error) {
+    console.error(
+      "Unexpected fetchBuddies error:",
+      error,
+    );
+
+    setBuddies([]);
   }
+}
 
   // =========================================
   // FILTERING

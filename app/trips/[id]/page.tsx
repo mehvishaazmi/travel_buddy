@@ -141,14 +141,13 @@ export default function TripDetailPage() {
       // VERIFY ACCESS
       // ====================================
 
-      const { data: memberCheck } = await supabase
-        .from("trip_members")
-        .select("*")
-        .eq("trip_id", id)
-        .eq("user_id", user?.id)
-        .single();
+      const response = await fetch("/api/trips");
 
-      if (!memberCheck) {
+      const userTrips = await response.json();
+
+      const hasAccess = userTrips.some((trip: any) => trip.id === id);
+
+      if (!hasAccess) {
         toast.error("Access denied");
 
         router.push("/trips");
@@ -160,14 +159,12 @@ export default function TripDetailPage() {
       // FETCH TRIP
       // ====================================
 
-      const { data, error } = await supabase
-        .from("trips")
-        .select("*")
-        .eq("id", id)
-        .single();
+      const tripResponse = await fetch(`/api/trips/${id}`);
 
-      if (error || !data) {
-        console.error(error);
+      const data = await tripResponse.json();
+
+      if (!tripResponse.ok) {
+        console.error(data);
 
         setNotFound(true);
 

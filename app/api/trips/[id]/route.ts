@@ -4,45 +4,79 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export async function GET(
   req: Request,
-  context: { params: Promise<{ id: string }> }, // ✅ FIX
+  context: { params: Promise<{ id: string }> },
 ) {
-  const { userId } = await auth();
+  try {
+    const { userId } = await auth();
 
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 },
+      );
+    }
+
+    const { id } = await context.params;
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "No ID provided" },
+        { status: 400 },
+      );
+    }
+
+    // ====================================
+    // VERIFY MEMBERSHIP
+    // ====================================
+
+    const {
+      data: membership,
+      error: membershipError,
+    } = await supabaseAdmin
+      .from("trip_members")
+      .select("*")
+      .eq("trip_id", id)
+      .eq("user_id", userId)
+      .single();
+
+    if (membershipError || !membership) {
+      return NextResponse.json(
+        { error: "Access denied" },
+        { status: 403 },
+      );
+    }
+
+    // ====================================
+    // FETCH TRIP
+    // ====================================
+
+    const {
+      data: trip,
+      error,
+    } = await supabaseAdmin
+      .from("trips")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error || !trip) {
+      return NextResponse.json(
+        { error: "Trip not found" },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json(trip);
+
+  } catch (err: any) {
+    console.error(err);
+
+    return NextResponse.json(
+      {
+        error:
+          err.message || "Server error",
+      },
+      { status: 500 },
+    );
   }
-
-  // ✅ MUST unwrap params
-  const { id } = await context.params;
-
-  if (!id) {
-    return NextResponse.json({ error: "No ID provided" }, { status: 400 });
-  }
-
-  console.log("API ID:", id);
-
-  const { data, error } = await supabaseAdmin
-    .from("trips")
-    .select("*")
-    .eq("id", id);
-  if (process.env.NODE_ENV === "development") {
-    console.error(error);
-  }
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  if (!data || data.length === 0) {
-    return NextResponse.json({ error: "Trip not found" }, { status: 404 });
-  }
-
-  const trip = data[0];
-
-  // 🔐 SECURITY CHECK
-  if (trip.user_id !== userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
-
-  return NextResponse.json(trip);
 }
